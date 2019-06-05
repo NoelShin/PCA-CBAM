@@ -12,6 +12,8 @@ if __name__ == '__main__':
     from datetime import datetime
 
     opt = BaseOptions().parse()
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(opt.gpu_id)
+
     dataset_name = opt.dataset
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
 
@@ -41,6 +43,7 @@ if __name__ == '__main__':
                                 dataset=opt.dataset,
                                 attention=opt.attention_module,
                                 branches=list(opt.branches.split(', ')),
+                                scale=opt.scale,
                                 shared_params=opt.shared_params).apply(init_weights).to(device)
     else:
         """
