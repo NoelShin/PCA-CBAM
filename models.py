@@ -1,3 +1,4 @@
+from functools import partial
 import torch.nn as nn
 import torch.nn.functional as F
 from attention_modules import BAM, CBAM, SCBAM, SqueezeExcitationBlock
@@ -5,7 +6,7 @@ from attention_modules import BAM, CBAM, SCBAM, SqueezeExcitationBlock
 
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM', branches=None,
-                 shared_params=True):
+                 scale=False, shared_params=True):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -31,7 +32,7 @@ class ResidualBlock(nn.Module):
             block += [CBAM(output_ch)]
 
         elif attention == 'SCBAM':
-            block += [SCBAM(output_ch, branches, shared_params)]
+            block += [SCBAM(output_ch, branches, scale, shared_params)]
 
         elif attention == 'SE':
             block += [SqueezeExcitationBlock(output_ch)]
@@ -55,10 +56,13 @@ class ResidualBlock(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    def __init__(self, n_layers=50, dataset='ImageNet', attention='CBAM', branches=None, shared_params=True):
+    def __init__(self, n_layers=50, dataset='ImageNet', attention='CBAM', branches=None, scale=False,
+                 shared_params=True):
         super(ResidualNetwork, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
+        RB = partial(ResidualBlock, attention=attention, branches=branches, scale=scale, shared_params=shared_params)
+
         if dataset == 'ImageNet':
             network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
                        norm(64),
@@ -79,124 +83,91 @@ class ResidualNetwork(nn.Module):
             pass
 
         if n_layers == 18:
-            network += [ResidualBlock(64, 64, attention=attention, branches=branches, shared_params=shared_params),
-                        ResidualBlock(64, 64, attention=attention, branches=branches, shared_params=shared_params)]
+            network += [RB(64, 64),
+                        RB(64, 64)]
             network += [BAM(64)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(64, 128, first_conv_stride=2, attention=attention, branches=branches,
-                                      shared_params=shared_params),
-                        ResidualBlock(128, 128, attention=attention, branches=branches, shared_params=shared_params)]
+            network += [RB(64, 128, first_conv_stride=2),
+                        RB(128, 128)]
             network += [BAM(128)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(128, 256, first_conv_stride=2, attention=attention, branches=branches,
-                                      shared_params=shared_params),
-                        ResidualBlock(256, 256, attention=attention, branches=branches, shared_params=shared_params)]
+            network += [RB(128, 256, first_conv_stride=2),
+                        RB(256, 256)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(256, 512, first_conv_stride=2, attention=attention, branches=branches,
-                                      shared_params=shared_params),
-                        ResidualBlock(512, 512, attention=attention, branches=branches, shared_params=shared_params)]
+            network += [RB(256, 512, first_conv_stride=2),
+                        RB(512, 512)]
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(512, n_classes)]
 
         elif n_layers == 34:
-            network += [ResidualBlock(64, 64, attention=attention, branches=branches, shared_params=shared_params)
+            network += [RB(64, 64)
                         for _ in range(3)]
             network += [BAM(64)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(64, 128, first_conv_stride=2, attention=attention, branches=branches,
-                                      shared_params=shared_params)]
-            network += [ResidualBlock(128, 128, attention=attention, branches=branches, shared_params=shared_params)
-                        for _ in range(3)]
+            network += [RB(64, 128, first_conv_stride=2)]
+            network += [RB(128, 128) for _ in range(3)]
             network += [BAM(128)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(128, 256, first_conv_stride=2, attention=attention, branches=branches,
-                                      shared_params=shared_params)]
-            network += [ResidualBlock(256, 256, attention=attention, branches=branches, shared_params=shared_params)
-                        for _ in range(5)]
+            network += [RB(128, 256, first_conv_stride=2)]
+            network += [RB(256, 256) for _ in range(5)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(256, 512, first_conv_stride=2, attention=attention, branches=branches,
-                                      shared_params=shared_params)]
-            network += [ResidualBlock(512, 512, attention=attention, branches=branches, shared_params=shared_params)
-                        for _ in range(2)]
+            network += [RB(256, 512, first_conv_stride=2)]
+            network += [RB(512, 512) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(512, n_classes)]
 
         elif n_layers == 50:
-            network += [ResidualBlock(64, 256, bottle_neck_ch=64, attention=attention, branches=branches,
-                                      shared_params=shared_params)]
-            network += [ResidualBlock(256, 256, bottle_neck_ch=64, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=64)]
+            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(256, 512, bottle_neck_ch=128, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(512, 512, bottle_neck_ch=128, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2,)]
+            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(512, 1024, bottle_neck_ch=256, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(1024, 1024, bottle_neck_ch=256, attention=attention,
-                                      branches=branches, shared_params=shared_params) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]
+            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(5)]
             network += [BAM(1024)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(2048, 2048, bottle_neck_ch=512, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
+            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
         elif n_layers == 101:
-            network += [ResidualBlock(64, 256, bottle_neck_ch=64, attention=attention, branches=branches,
-                                      shared_params=shared_params)]
-            network += [ResidualBlock(256, 256, bottle_neck_ch=64, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=64)]
+            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(64)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(256, 512, bottle_neck_ch=128, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(512, 512, bottle_neck_ch=128, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]
+            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
             network += [BAM(128)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(512, 1024, bottle_neck_ch=256, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(1024, 1024, bottle_neck_ch=256, attention=attention,
-                                      branches=branches, shared_params=shared_params) for _ in range(22)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]
+            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(22)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(2048, 2048, bottle_neck_ch=512, attention=attention,
-                                      branches=branches, shared_params=shared_params) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
+            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
         elif n_layers == 152:
-            network += [ResidualBlock(64, 256, bottle_neck_ch=64, attention=attention, branches=branches,
-                                      shared_params=shared_params)]
-            network += [ResidualBlock(256, 256, bottle_neck_ch=64, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=64)]
+            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(256, 512, bottle_neck_ch=128, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(512, 512, bottle_neck_ch=128, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(7)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]
+            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(7)]
             network += [BAM(512)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(512, 1024, bottle_neck_ch=256, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(1024, 1024, bottle_neck_ch=256, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(35)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]
+            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(35)]
             network += [BAM(1024)] if attention == 'BAM' else []
 
-            network += [ResidualBlock(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, attention=attention,
-                                      branches=branches, shared_params=shared_params)]
-            network += [ResidualBlock(2048, 2048, bottle_neck_ch=512, attention=attention, branches=branches,
-                                      shared_params=shared_params) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
+            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
