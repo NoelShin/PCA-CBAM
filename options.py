@@ -16,10 +16,10 @@ class BaseOptions(object):
         # Attention options
         parser.add_argument('--attention_module', type=str, default='SCBAM',
                             help='Choose among [BAM, CBAM, None, SCBAM, SE]')
-        parser.add_argument('--branches', type=str, default='max, var', help='What branches you want to use for'
+        parser.add_argument('--branches', type=str, default='avg, max', help='What branches you want to use for'
                                                                                   'SCBAM')
-        # parser.add_argument('--ordered', action='store_true', default=False, help='Channel-Spatial order')
-        parser.add_argument('--scale', action='store_true', default=True)
+        parser.add_argument('--ordered', action='store_true', default=True, help='Channel-Spatial order')
+        parser.add_argument('--scale', action='store_true', default=False)
         parser.add_argument('--shared_params', action='store_true', default=True, help='If you want to make SCBAM have'
                                                                                        'shared params between each'
                                                                                        'branch')
@@ -62,7 +62,9 @@ class BaseOptions(object):
         if args.attention_module == 'SCBAM':
             model_name = model_name + '_' + str(args.branches).replace(', ', '_')
             model_name += '_shared_params_' if args.shared_params else ''
-            model_name += '_scaled' if args.scale else ''
+            model_name += '_scaled_' if args.scale else ''
+            model_name += '_ordered_' if args.ordered else ''
+        model_name = model_name.strip('_')
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
         args.dir_model = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Model')
