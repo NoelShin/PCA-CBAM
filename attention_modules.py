@@ -117,7 +117,7 @@ class MaxBranch(nn.Module):
 
 
 class SCBAM(nn.Module):
-    def __init__(self, n_ch, branches='var', scale=False, shared_params=False):
+    def __init__(self, n_ch, branches='var', ordered=False, scale=False, shared_params=False):
         super(SCBAM, self).__init__()
         assert isinstance(branches, (list, str, tuple))
         list_branches = nn.ModuleList()
@@ -194,7 +194,7 @@ class SCBAM(nn.Module):
                             list_branches.append(VarianceBranch(n_ch))
                 self.list_branches = list_branches
 
-        # self.ordered = ordered
+        self.ordered = ordered
         self.scale = scale
         self.shared_params = shared_params
 
@@ -204,6 +204,10 @@ class SCBAM(nn.Module):
             for i in range(len(self.channel_attentions)):
                 if self.scale:
                     y += self.norm(self.channel_attentions[i](x) + self.spatial_attentions[i](x))
+
+                elif self.ordered:
+                    return x * torch.sigmoid(self.spatial_attentions[i](x * torch.sigmoid(self.channel_attentions[i](x))))
+
                 else:
                     y += self.channel_attentions[i](x) + self.spatial_attentions[i](x)
 
