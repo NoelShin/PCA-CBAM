@@ -43,6 +43,7 @@ if __name__ == '__main__':
                                 dataset=opt.dataset,
                                 attention=opt.attention_module,
                                 branches=list(opt.branches.split(', ')),
+                                ordered=opt.ordered,
                                 scale=opt.scale,
                                 shared_params=opt.shared_params).apply(init_weights).to(device)
     else:
