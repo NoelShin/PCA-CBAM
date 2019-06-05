@@ -22,17 +22,15 @@ class BAM(nn.Module):
         channel_branch = [nn.AdaptiveAvgPool2d(1),
                           View(-1),
                           nn.Linear(n_ch, n_ch // reduction_ratio),
-                          norm1d(n_ch // reduction_ratio),
                           act,
                           nn.Linear(n_ch // reduction_ratio, n_ch),
-                          View(n_ch, 1, 1)]
+                          View(n_ch, 1, 1),
+                          norm2d(n_ch)]
         spatial_branch = [nn.Conv2d(n_ch, n_ch // reduction_ratio, 1),
-                          norm2d(n_ch // reduction_ratio),
                           act]
         spatial_branch += [nn.Conv2d(n_ch // reduction_ratio, n_ch // reduction_ratio, 3, padding=4, dilation=dilation),
-                           norm2d(n_ch // reduction_ratio),
                            act] * 2
-        spatial_branch += [nn.Conv2d(n_ch // reduction_ratio, 1, 1)]
+        spatial_branch += [nn.Conv2d(n_ch // reduction_ratio, 1, 1, bias=False), norm2d(1)]
 
         self.channel_branch = nn.Sequential(*channel_branch)
         self.spatial_branch = nn.Sequential(*spatial_branch)
@@ -99,6 +97,14 @@ class GlobalVarPool2d(nn.Module):
         return torch.mean(x ** 2, dim=(2, 3)) - torch.mean(x, dim=(2, 3)) ** 2
 
 
+class Identity(nn.Module):
+    def __init__(self):
+        super(Identity, self).__init__()
+
+    def forward(self, x):
+        return x
+
+
 class MaxBranch(nn.Module):
     def __init__(self, n_ch):
         super(MaxBranch, self).__init__()
@@ -111,7 +117,7 @@ class MaxBranch(nn.Module):
 
 
 class SCBAM(nn.Module):
-    def __init__(self, n_ch, branches='var', shared_params=False):
+    def __init__(self, n_ch, branches='var', scale=False, shared_params=False):
         super(SCBAM, self).__init__()
         assert isinstance(branches, (list, str, tuple))
         list_branches = nn.ModuleList()
@@ -141,6 +147,7 @@ class SCBAM(nn.Module):
                                                             act,
                                                             linear_B,
                                                             View(n_ch, 1, 1)))
+
                     spatial_attentions.append(nn.Sequential(ChannelAxisPool('avg'), conv))
 
                 if 'max' in branches:
@@ -164,28 +171,46 @@ class SCBAM(nn.Module):
                 self.channel_attentions = channel_attentions
                 self.spatial_attentions = spatial_attentions
 
+                self.norm = nn.BatchNorm2d(n_ch) if scale else None
+
             else:
                 for branch in branches:
                     assert branch in ['avg', 'max', 'var']
                     if branch == 'avg':
-                        list_branches.append(AverageBranch(n_ch))
+                        if self.scale:
+                            list_branches.append(nn.Sequential(AverageBranch(n_ch), nn.BatchNorm2d(n_ch)))
+                        else:
+                            list_branches.append(AverageBranch(n_ch))
+
                     elif branch == 'max':
-                        list_branches.append(MaxBranch(n_ch))
+                        if self.scale:
+                            list_branches.append(nn.Sequential(MaxBranch(n_ch), nn.BatchNorm2d(n_ch)))
+                        else:
+                            list_branches.append(MaxBranch(n_ch))
                     else:
-                        list_branches.append(VarianceBranch(n_ch))
+                        if self.scale:
+                            list_branches.append(nn.Sequential(VarianceBranch(n_ch), nn.BatchNorm2d(n_ch)))
+                        else:
+                            list_branches.append(VarianceBranch(n_ch))
                 self.list_branches = list_branches
 
+        # self.ordered = ordered
+        self.scale = scale
         self.shared_params = shared_params
 
     def forward(self, x):
         y = torch.zeros_like(x)
         if self.shared_params:
             for i in range(len(self.channel_attentions)):
-                y += self.channel_attentions[i](x)
-                y += self.spatial_attentions[i](x)
+                if self.scale:
+                    y += self.norm(self.channel_attentions[i](x) + self.spatial_attentions[i](x))
+                else:
+                    y += self.channel_attentions[i](x) + self.spatial_attentions[i](x)
+
         else:
             for branch in self.list_branches:
                 y += branch(x)
+
         return x * torch.sigmoid(y)
 
 
