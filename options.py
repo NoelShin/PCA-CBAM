@@ -6,7 +6,7 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_id', type=int, default=0)
+        parser.add_argument('--gpu_id', type=int, default=3)
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -14,10 +14,12 @@ class BaseOptions(object):
         parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
 
         # Attention options
-        parser.add_argument('--attention_module', type=str, default='SE',
-                            help='Choose among [BAM, CBAM, None, PCA-CBAM, SCBAM, SE]')
-        parser.add_argument('--branches', type=str, default='avg, max, var', help='What branches you want to use for'
+        parser.add_argument('--attention_module', type=str, default='SCBAM',
+                            help='Choose among [BAM, CBAM, None, SCBAM, SE]')
+        parser.add_argument('--branches', type=str, default='max, var', help='What branches you want to use for'
                                                                                   'SCBAM')
+        # parser.add_argument('--ordered', action='store_true', default=False, help='Channel-Spatial order')
+        parser.add_argument('--scale', action='store_true', default=True)
         parser.add_argument('--shared_params', action='store_true', default=True, help='If you want to make SCBAM have'
                                                                                        'shared params between each'
                                                                                        'branch')
@@ -59,7 +61,8 @@ class BaseOptions(object):
         model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module
         if args.attention_module == 'SCBAM':
             model_name = model_name + '_' + str(args.branches).replace(', ', '_')
-            model_name += '_shared_params' if args.shared_params else ''
+            model_name += '_shared_params_' if args.shared_params else ''
+            model_name += '_scaled' if args.scale else ''
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
         args.dir_model = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Model')
