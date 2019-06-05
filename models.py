@@ -6,7 +6,7 @@ from attention_modules import BAM, CBAM, SCBAM, SqueezeExcitationBlock
 
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM', branches=None,
-                 scale=False, shared_params=True):
+                 ordered=False, scale=False, shared_params=True):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -32,7 +32,7 @@ class ResidualBlock(nn.Module):
             block += [CBAM(output_ch)]
 
         elif attention == 'SCBAM':
-            block += [SCBAM(output_ch, branches, scale, shared_params)]
+            block += [SCBAM(output_ch, branches, ordered, scale, shared_params)]
 
         elif attention == 'SE':
             block += [SqueezeExcitationBlock(output_ch)]
@@ -56,12 +56,13 @@ class ResidualBlock(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    def __init__(self, n_layers=50, dataset='ImageNet', attention='CBAM', branches=None, scale=False,
+    def __init__(self, n_layers=50, dataset='ImageNet', attention='CBAM', branches=None, ordered=False, scale=False,
                  shared_params=True):
         super(ResidualNetwork, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
-        RB = partial(ResidualBlock, attention=attention, branches=branches, scale=scale, shared_params=shared_params)
+        RB = partial(ResidualBlock, attention=attention, branches=branches, ordered=ordered, scale=scale,
+                     shared_params=shared_params)
 
         if dataset == 'ImageNet':
             network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
