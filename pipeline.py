@@ -5,7 +5,6 @@ from torch.utils.data import Dataset
 from torchvision.datasets import CIFAR100
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomCrop, RandomHorizontalFlip, RandomResizedCrop
 from torchvision.transforms import Resize, ToTensor
-import numpy as np
 from PIL import Image
 
 
@@ -16,13 +15,15 @@ class CustomCIFAR100(Dataset):
 
         if val:
             self.dataset = CIFAR100(root=dir_dataset, train=False, download=True)
-            self.transform = Compose([ToTensor(), Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])])
+            self.transform = Compose([ToTensor(),
+                                      Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])])
 
         else:
             self.dataset = CIFAR100(root=dir_dataset, train=True, download=True)
             self.transform = Compose([RandomCrop((32, 32), padding=4, fill=0, padding_mode='constant'),
-                                      RandomHorizontalFlip(), ToTensor(), Normalize(mean=[0.507, 0.487, 0.441],
-                                                                                    std=[0.267, 0.256, 0.276])])
+                                      RandomHorizontalFlip(),
+                                      ToTensor(),
+                                      Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])])
 
     def __getitem__(self, index):
         return self.transform(self.dataset[index][0]), self.dataset[index][1]
@@ -44,7 +45,9 @@ class CustomImageNet1K(Dataset):
                     label.append(int(row) - 1)
             self.label = label
 
-            self.transform = Compose([Resize(256), CenterCrop(224), ToTensor(),
+            self.transform = Compose([Resize(256),
+                                      CenterCrop(224),
+                                      ToTensor(),
                                       Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
         else:
@@ -59,7 +62,9 @@ class CustomImageNet1K(Dataset):
                         pass
             self.label = dict_WNID2label
 
-            self.transform = Compose([RandomResizedCrop(224), RandomHorizontalFlip(), ToTensor(),
+            self.transform = Compose([RandomResizedCrop(224),
+                                      RandomHorizontalFlip(),
+                                      ToTensor(),
                                       Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
         self.val = val
 
