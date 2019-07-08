@@ -31,8 +31,15 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError("Invalid dataset {}. Choose among ['CIFAR100', 'ImageNet']".format(dataset_name))
 
-    data_loader = DataLoader(dataset, batch_size=opt.batch_size, num_workers=opt.n_workers, shuffle=True)
-    test_data_loader = DataLoader(test_dataset, batch_size=opt.batch_size, num_workers=opt.n_workers, shuffle=False)
+    data_loader = DataLoader(dataset,
+                             batch_size=opt.batch_size,
+                             num_workers=opt.n_workers,
+                             shuffle=True)
+
+    test_data_loader = DataLoader(test_dataset,
+                                  batch_size=opt.batch_size,
+                                  num_workers=opt.n_workers,
+                                  shuffle=False)
 
     backbone_network = opt.backbone_network
     n_layers = opt.n_layers
@@ -41,11 +48,7 @@ if __name__ == '__main__':
         from models import ResidualNetwork, init_weights
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
-                                attention=opt.attention_module,
-                                branches=list(opt.branches.split(', ')),
-                                ordered=opt.ordered,
-                                scale=opt.scale,
-                                shared_params=opt.shared_params).apply(init_weights).to(device)
+                                attention=opt.attention_module).apply(init_weights).to(device)
     else:
         """
         Other models
@@ -53,12 +56,19 @@ if __name__ == '__main__':
 
     criterion = nn.CrossEntropyLoss()
     if dataset_name == 'CIFAR100':
-        optim = torch.optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay,
-                                nesterov=True)
+        optim = torch.optim.SGD(model.parameters(),
+                                lr=opt.lr,
+                                momentum=opt.momentum,
+                                weight_decay=opt.weight_decay)
         lr_scheduler = MultiStepLR(optim, milestones=[150, 225], gamma=0.1)
+
     elif dataset_name == 'ImageNet':
-        optim = torch.optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
+        optim = torch.optim.SGD(model.parameters(),
+                                lr=opt.lr,
+                                momentum=opt.momentum,
+                                weight_decay=opt.weight_decay)
         lr_scheduler = MultiStepLR(optim, milestones=[30, 60], gamma=0.1)
+
     else:
         """
                 For other datasets
