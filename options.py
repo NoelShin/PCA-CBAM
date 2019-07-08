@@ -6,7 +6,7 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_id', type=int, default=3)
+        parser.add_argument('--gpu_id', type=int, default=1)
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -14,15 +14,8 @@ class BaseOptions(object):
         parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
 
         # Attention options
-        parser.add_argument('--attention_module', type=str, default='SCBAM',
-                            help='Choose among [BAM, CBAM, None, SCBAM, SE]')
-        parser.add_argument('--branches', type=str, default='avg, max', help='What branches you want to use for'
-                                                                                  'SCBAM')
-        parser.add_argument('--ordered', action='store_true', default=True, help='Channel-Spatial order')
-        parser.add_argument('--scale', action='store_true', default=False)
-        parser.add_argument('--shared_params', action='store_true', default=True, help='If you want to make SCBAM have'
-                                                                                       'shared params between each'
-                                                                                       'branch')
+        parser.add_argument('--attention_module', type=str, default='SE',
+                            help='Choose among [BAM, CBAM, None, SE, SeparableCBAM]')
 
         parser.add_argument('--dataset', type=str, default='CIFAR100', help='Dataset name. Choose among'
                                                                             '[CIFAR100, ImageNet, MSCOCO, VOC2007]')
@@ -58,12 +51,8 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module
-        if args.attention_module == 'SCBAM':
-            model_name = model_name + '_' + str(args.branches).replace(', ', '_')
-            model_name += '_shared_params_' if args.shared_params else ''
-            model_name += '_scaled_' if args.scale else ''
-            model_name += '_ordered_' if args.ordered else ''
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_Caffe'
+
         model_name = model_name.strip('_')
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
@@ -72,6 +61,13 @@ class BaseOptions(object):
         os.makedirs(args.dir_model, exist_ok=True)
 
         args.path_log_analysis = os.path.join(args.dir_analysis, 'log.txt')
+        if os.path.isfile(args.path_log_analysis):
+            answer = input("Already existed log. Do you want to overwrite it? [y/n] : ")
+            if answer == 'y':
+                pass
+            else:
+                raise
+
         with open(args.path_log_analysis, 'wt') as log:
             log.write('Epoch, Epoch_best_top1,  Epoch_best_top5, Training_loss, Top1_error, Top5_error\n')
             log.close()
