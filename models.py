@@ -1,21 +1,21 @@
 from functools import partial
 import torch.nn as nn
 import torch.nn.functional as F
-from attention_modules import BAM, CBAM, SCBAM, SqueezeExcitationBlock
+from attention_modules import BAM, CBAM, SqueezeExcitationBlock
+from scbam import SeparableCBAM
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM', branches=None,
-                 ordered=False, scale=False, shared_params=True):
+    def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM'):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
 
         if bottle_neck_ch:
-            block = [nn.Conv2d(input_ch, bottle_neck_ch, 1, stride=first_conv_stride, bias=False),
+            block = [nn.Conv2d(input_ch, bottle_neck_ch, 1, stride=first_conv_stride, bias=False),  # Caffe version has stride 2 here
                      norm(bottle_neck_ch),
                      act]
-            block += [nn.Conv2d(bottle_neck_ch, bottle_neck_ch, 3, padding=1, bias=False),
+            block += [nn.Conv2d(bottle_neck_ch, bottle_neck_ch, 3, padding=1, bias=False),  # PyTorch version has stride 2 here
                       norm(bottle_neck_ch),
                       act]
             block += [nn.Conv2d(bottle_neck_ch, output_ch, 1, bias=False),
@@ -31,11 +31,11 @@ class ResidualBlock(nn.Module):
         if attention == 'CBAM':
             block += [CBAM(output_ch)]
 
-        elif attention == 'SCBAM':
-            block += [SCBAM(output_ch, branches, ordered, scale, shared_params)]
-
         elif attention == 'SE':
             block += [SqueezeExcitationBlock(output_ch)]
+
+        elif attention == 'SeparableCBAM':
+            block += [SeparableCBAM(output_ch)]
 
         if input_ch != output_ch:
             side_block = [nn.Conv2d(input_ch, output_ch, 1, stride=first_conv_stride, bias=False),
@@ -56,19 +56,17 @@ class ResidualBlock(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    def __init__(self, n_layers=50, dataset='ImageNet', attention='CBAM', branches=None, ordered=False, scale=False,
-                 shared_params=True):
+    def __init__(self, n_layers=50, dataset='ImageNet', attention='CBAM'):
         super(ResidualNetwork, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
-        RB = partial(ResidualBlock, attention=attention, branches=branches, ordered=ordered, scale=scale,
-                     shared_params=shared_params)
+        RB = partial(ResidualBlock, attention=attention)
 
         if dataset == 'ImageNet':
             network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
                        norm(64),
                        act,
-                       nn.MaxPool2d(kernel_size=3, stride=2)]
+                       nn.MaxPool2d(kernel_size=3, stride=2, padding=1)]
             n_classes = 1000
 
         elif dataset == 'CIFAR100':
@@ -123,7 +121,7 @@ class ResidualNetwork(nn.Module):
             network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2,)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]
             network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
 
@@ -172,6 +170,7 @@ class ResidualNetwork(nn.Module):
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
+
         else:
             raise NotImplementedError("Invalid n_layers {}. Choose among 18, 34, 50, 101, or 152.".format(n_layers))
 
@@ -205,13 +204,3 @@ def init_weights(module):
 
     elif isinstance(module, nn.Linear):
         nn.init.zeros_(module.bias)
-
-
-if __name__ == '__main__':
-    resnet = ResidualNetwork(50, dataset='CIFAR100', attention='None', shared_params=True, branches=['avg', 'max', 'var'])
-    from ptflops import get_model_complexity_info
-    from time import time
-
-    st = time()
-    flops, params = get_model_complexity_info(resnet, (3, 32, 32), as_strings=False, print_per_layer_stat=True)
-    print(time() - st, "flops: ", flops, "params: ", params)
