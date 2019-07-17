@@ -6,7 +6,7 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_id', type=int, default=1)
+        parser.add_argument('--gpu_id', type=int, default=3)
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -14,7 +14,7 @@ class BaseOptions(object):
         parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
 
         # Attention options
-        parser.add_argument('--attention_module', type=str, default='SE',
+        parser.add_argument('--attention_module', type=str, default='SeparableCBAM',
                             help='Choose among [BAM, CBAM, None, SE, SeparableCBAM]')
 
         parser.add_argument('--dataset', type=str, default='CIFAR100', help='Dataset name. Choose among'
@@ -51,7 +51,7 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_Caffe'
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '1red1res&3r31_PT_init_1'
 
         model_name = model_name.strip('_')
 
@@ -62,7 +62,7 @@ class BaseOptions(object):
 
         args.path_log_analysis = os.path.join(args.dir_analysis, 'log.txt')
         if os.path.isfile(args.path_log_analysis):
-            answer = input("Already existed log. Do you want to overwrite it? [y/n] : ")
+            answer = input("Already existed log {}. Do you want to overwrite it? [y/n] : ".format(model_name))
             if answer == 'y':
                 pass
             else:
