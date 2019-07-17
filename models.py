@@ -12,10 +12,10 @@ class ResidualBlock(nn.Module):
         norm = nn.BatchNorm2d
 
         if bottle_neck_ch:
-            block = [nn.Conv2d(input_ch, bottle_neck_ch, 1, stride=first_conv_stride, bias=False),  # Caffe version has stride 2 here
+            block = [nn.Conv2d(input_ch, bottle_neck_ch, 1, bias=False),  # Caffe version has stride 2 here
                      norm(bottle_neck_ch),
                      act]
-            block += [nn.Conv2d(bottle_neck_ch, bottle_neck_ch, 3, padding=1, bias=False),  # PyTorch version has stride 2 here
+            block += [nn.Conv2d(bottle_neck_ch, bottle_neck_ch, 3, padding=1, stride=first_conv_stride,  bias=False),  # PyTorch version has stride 2 here
                       norm(bottle_neck_ch),
                       act]
             block += [nn.Conv2d(bottle_neck_ch, output_ch, 1, bias=False),
@@ -85,14 +85,17 @@ class ResidualNetwork(nn.Module):
             network += [RB(64, 64),
                         RB(64, 64)]
             network += [BAM(64)] if attention == 'BAM' else []
+            network += [SeparableCBAM(64)] if attention == 'SeparableCBAM' else []
 
             network += [RB(64, 128, first_conv_stride=2),
                         RB(128, 128)]
             network += [BAM(128)] if attention == 'BAM' else []
+            network += [SeparableCBAM(128)] if attention == 'SeparableCBAM' else []
 
             network += [RB(128, 256, first_conv_stride=2),
                         RB(256, 256)]
             network += [BAM(256)] if attention == 'BAM' else []
+            network += [SeparableCBAM(256)] if attention == 'SeparableCBAM' else []
 
             network += [RB(256, 512, first_conv_stride=2),
                         RB(512, 512)]
@@ -120,14 +123,17 @@ class ResidualNetwork(nn.Module):
             network += [RB(64, 256, bottle_neck_ch=64)]
             network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
+            # network += [SeparableCBAM(256)] if attention == 'SeparableCBAM' else []
 
             network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]
             network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
+            # network += [SeparableCBAM(512)] if attention == 'SeparableCBAM' else []
 
             network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]
             network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(5)]
             network += [BAM(1024)] if attention == 'BAM' else []
+            # network += [SeparableCBAM(1024)] if attention == 'SeparableCBAM' else []
 
             network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
             network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
@@ -170,7 +176,6 @@ class ResidualNetwork(nn.Module):
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
-
         else:
             raise NotImplementedError("Invalid n_layers {}. Choose among 18, 34, 50, 101, or 152.".format(n_layers))
 
@@ -196,11 +201,11 @@ class View(nn.Module):
 
 def init_weights(module):
     if isinstance(module, nn.Conv2d):
-        nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(module.weight, mode='fan_out')
 
     elif isinstance(module, nn.BatchNorm2d):
         nn.init.ones_(module.weight)
         nn.init.zeros_(module.bias)
 
     elif isinstance(module, nn.Linear):
-        nn.init.zeros_(module.bias)
+        nn.init.kaiming_normal_(module.weight)
