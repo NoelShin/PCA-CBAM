@@ -45,10 +45,10 @@ if __name__ == '__main__':
     n_layers = opt.n_layers
 
     if backbone_network == 'ResNet':
-        from models import ResidualNetwork, init_weights
+        from models import ResidualNetwork
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
-                                attention=opt.attention_module).apply(init_weights).to(device)
+                                attention=opt.attention_module).to(device)
     else:
         """
         Other models
