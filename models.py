@@ -6,7 +6,8 @@ from scbam import SeparableCBAM
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM'):
+    def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM',
+                 crop_boundary=(0, 0)):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -35,7 +36,7 @@ class ResidualBlock(nn.Module):
             block += [SqueezeExcitationBlock(output_ch)]
 
         elif attention == 'SeparableCBAM':
-            block += [SeparableCBAM(output_ch)]
+            block += [SeparableCBAM(output_ch, crop_boundary)]
 
         if input_ch != output_ch:
             side_block = [nn.Conv2d(input_ch, output_ch, 1, stride=first_conv_stride, bias=False),
@@ -123,20 +124,17 @@ class ResidualNetwork(nn.Module):
             network += [RB(64, 256, bottle_neck_ch=64)]
             network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
-            # network += [SeparableCBAM(256)] if attention == 'SeparableCBAM' else []
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]
-            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0))]  # 28
+            network += [RB(512, 512, bottle_neck_ch=128, crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0)) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
-            # network += [SeparableCBAM(512)] if attention == 'SeparableCBAM' else []
 
-            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]
-            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2, crop_boundary=(2, 2) if dataset == "ImageNet" else (0, 0))]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=256, crop_boundary=(2, 2) if dataset == "ImageNet" else (0, 0)) for _ in range(5)]
             network += [BAM(1024)] if attention == 'BAM' else []
-            # network += [SeparableCBAM(1024)] if attention == 'SeparableCBAM' else []
 
-            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
-            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, crop_boundary=(1, 1) if dataset == "ImageNet" else (0, 0))]
+            network += [RB(2048, 2048, bottle_neck_ch=512, crop_boundary=(1, 1) if dataset == "ImageNet" else (0, 0)) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
@@ -209,3 +207,20 @@ def init_weights(module):
 
     elif isinstance(module, nn.Linear):
         nn.init.kaiming_normal_(module.weight)
+
+
+if __name__ == '__main__':
+    import torch
+    resnet = ResidualNetwork(50,
+                             dataset='ImageNet',
+                             attention='SeparableCBAM')
+    # from thop import profile
+    # input = torch.randn(1, 3, 224, 224)
+    # flops, params = profile(resnet, inputs=(input,))
+    #
+    # print("flops: ", flops / 1.024 ** 3, " params: ", params)
+
+    from ptflops import get_model_complexity_info
+
+    flops, params = get_model_complexity_info(resnet, (3, 224, 224), as_strings=False, print_per_layer_stat=True)
+    print('GFlops:  ', flops / (1.024 ** 3), '# Params: ', params)
