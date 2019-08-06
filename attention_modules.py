@@ -91,7 +91,7 @@ class SpatialAttentionModule(nn.Module):
         super(SpatialAttentionModule, self).__init__()
         self.avg_descriptor = ChannelAxisPool('avg')
         self.max_descriptor = ChannelAxisPool('max')
-        self.block = nn.Sequential(nn.Conv2d(2, 1, 7, padding=3),
+        self.block = nn.Sequential(nn.Conv2d(2, 1, 7, padding=3, bias=False),
                                    nn.BatchNorm2d(1, eps=1e-5, momentum=0.01, affine=True),
                                    nn.Sigmoid())
 
