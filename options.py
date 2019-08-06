@@ -6,7 +6,7 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_id', type=int, default=3)
+        parser.add_argument('--gpu_ids', type=str, default='2')
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -17,7 +17,7 @@ class BaseOptions(object):
         parser.add_argument('--attention_module', type=str, default='SeparableCBAM',
                             help='Choose among [BAM, CBAM, None, SE, SeparableCBAM]')
 
-        parser.add_argument('--dataset', type=str, default='CIFAR100', help='Dataset name. Choose among'
+        parser.add_argument('--dataset', type=str, default='ImageNet', help='Dataset name. Choose among'
                                                                             '[CIFAR100, ImageNet, MSCOCO, VOC2007]')
         parser.add_argument('--dir_checkpoints', type=str, default='./checkpoints')
         parser.add_argument('--dir_dataset', type=str, default='/DATA/RAID/Noel/Datasets/ImageNet-1K')
@@ -31,7 +31,8 @@ class BaseOptions(object):
     @staticmethod
     def define_hyper_params(args):
         if args.dataset == 'ImageNet':
-            args.batch_size = 3  # default 256
+            args.batch_size = 64  # default 256
+            args.dir_dataset = '/userhome/shin_g/Desktop/Projects/SCBAM_1/datasets/ImageNet1K'
             args.epochs = 90
             args.lr = 0.1
             args.momentum = 0.9
@@ -51,7 +52,7 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '1red1res&3r31_PT_init_1'
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_double_consec_conv7'
 
         model_name = model_name.strip('_')
 
