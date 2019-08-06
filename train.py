@@ -12,10 +12,10 @@ if __name__ == '__main__':
     from datetime import datetime
 
     opt = BaseOptions().parse()
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(opt.gpu_id)
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu_ids
 
     dataset_name = opt.dataset
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     torch.backends.cudnn.benchmark = True
 
@@ -48,7 +48,8 @@ if __name__ == '__main__':
         from models import ResidualNetwork
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
-                                attention=opt.attention_module).to(device)
+                                attention=opt.attention_module)
+        model = nn.DataParallel(model).to(device)
     else:
         """
         Other models
