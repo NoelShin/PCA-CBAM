@@ -79,9 +79,18 @@ if __name__ == '__main__':
     dict_best_top1 = {'Epoch': 0, 'Top1': 100.}
     dict_best_top5 = {'Epoch': 0, 'Top5': 100.}
 
+    if opt.resume:
+        state_dict = torch.load(opt.path_model)
+        model.load_state_dict(state_dict['state_dict'])
+        optim.load_state_dict(state_dict['optimizer'])
+        lr_scheduler.load_state_dict(state_dict['lr'])
+
+        dict_best_top1.update({'Epoch': opt.epoch_top1, 'Top1': opt.top1})
+        dict_best_top5.update({'Epoch': opt.epoch_top5, 'Top5': opt.top5})
+
     st = datetime.now()
     iter_total = 0
-    for epoch in range(opt.epochs):
+    for epoch in range(opt.epoch_recent, opt.epochs):
         list_loss = list()
         for input, label in tqdm(data_loader):
             iter_total += 1
