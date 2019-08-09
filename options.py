@@ -1,12 +1,13 @@
 import os
 import argparse
+from csv import reader
 
 
 class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_ids', type=str, default='2')
+        parser.add_argument('--gpu_ids', type=str, default='1')
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -19,12 +20,14 @@ class BaseOptions(object):
 
         parser.add_argument('--dataset', type=str, default='ImageNet', help='Dataset name. Choose among'
                                                                             '[CIFAR100, ImageNet, MSCOCO, VOC2007]')
+        parser.add_argument('--epoch_recent', type=int, default=0)
         parser.add_argument('--dir_checkpoints', type=str, default='./checkpoints')
         parser.add_argument('--dir_dataset', type=str, default='/DATA/RAID/Noel/Datasets/ImageNet-1K')
         parser.add_argument('--iter_report', type=int, default=5)
         parser.add_argument('--iter_save', type=int, default=100000)
         parser.add_argument('--n_workers', type=int, default=2)
         parser.add_argument('--residual_network_model', type=int, default=50, help="Choose among [18, 34, 50, 101]")
+        parser.add_argument('--resume', action='store_true', default=False)
 
         self.parser = parser
 
@@ -52,8 +55,7 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_double_consec_conv7'
-
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_triple_consec_c9'
         model_name = model_name.strip('_')
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
@@ -65,24 +67,65 @@ class BaseOptions(object):
         if os.path.isfile(args.path_log_analysis):
             answer = input("Already existed log {}. Do you want to overwrite it? [y/n] : ".format(model_name))
             if answer == 'y':
-                pass
+                with open(args.path_log_analysis, 'wt') as log:
+                    log.write('Epoch, Epoch_best_top1,  Epoch_best_top5, Training_loss, Top1_error, Top5_error\n')
+                    log.close()
+
+                with open(os.path.join(args.dir_model, 'options.txt'), 'wt') as log:
+                    opt = vars(args)
+                    print('-' * 50 + 'Options' + '-' * 50)
+                    for k, v in sorted(opt.items()):
+                        print(k, v)
+                        log.write(str(k) + ', ' + str(v) + '\n')
+                    print('-' * 107)
+                    log.close()
+
             else:
-                raise
+                answer = input("Do you want to resume training of {}? [y/n] : ".format(model_name))
+                if answer == 'y':
+                    args.resume = True
+                    best_top1 = {'Epoch': 0, 'Top1': 100.0}
+                    best_top5 = {'Epoch': 0, 'Top1': 100.0}
 
-        with open(args.path_log_analysis, 'wt') as log:
-            log.write('Epoch, Epoch_best_top1,  Epoch_best_top5, Training_loss, Top1_error, Top5_error\n')
-            log.close()
+                    with open(args.path_log_analysis, 'r') as log:
+                        for i, row in enumerate(reader(log)):
+                            if i == 0:
+                                continue
+                            else:
+                                if int(row[1]) > int(best_top1['Epoch']):
+                                    best_top1.update({'Epoch': row[1], 'Top1': float(row[4])})
+                                if int(row[2]) > int(best_top5['Epoch']):
+                                    best_top5.update({'Epoch': row[2], 'Top5': float(row[5])})
+                        args.epoch_top1 = int(best_top1['Epoch'])
+                        args.top1 = best_top1['Top1']
 
-        with open(os.path.join(args.dir_model, 'options.txt'), 'wt') as log:
-            opt = vars(args)
-            print('-' * 50 + 'Options' + '-' * 50)
-            for k, v in sorted(opt.items()):
-                print(k, v)
-                log.write(str(k) + ', ' + str(v) + '\n')
-            print('-' * 107)
-            log.close()
+                        args.epoch_top5 = int(best_top5['Epoch'])
+                        args.top5 = best_top5['Top5']
+                        log.close()
+
+                    if args.epoch_top1 > args.epoch_top5:
+                        args.epoch_recent = args.epoch_top1
+                        args.path_model = os.path.join(args.dir_model, 'top1_best.pt')
+                    else:
+                        args.epoch_recent = args.epoch_top5
+                        args.path_model = os.path.join(args.dir_model, 'top5_best.pt')
+                    print("Training resumes at epoch", args.epoch_recent)
+
+                else:
+                    NotImplementedError
+        else:
+            with open(args.path_log_analysis, 'wt') as log:
+                log.write('Epoch, Epoch_best_top1,  Epoch_best_top5, Training_loss, Top1_error, Top5_error\n')
+                log.close()
+
+            with open(os.path.join(args.dir_model, 'options.txt'), 'wt') as log:
+                opt = vars(args)
+                print('-' * 50 + 'Options' + '-' * 50)
+                for k, v in sorted(opt.items()):
+                    print(k, v)
+                    log.write(str(k) + ', ' + str(v) + '\n')
+                print('-' * 107)
+                log.close()
+
         return args
-
-
-if __name__ == '__main__':
-    opt = BaseOptions().parse()
+    
