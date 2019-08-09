@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 
 
@@ -33,22 +34,49 @@ class GlobalVarPool2d(nn.Module):
         return torch.mean(x ** 2, dim=(2, 3), keepdim=True) - torch.mean(x, dim=(2, 3), keepdim=True) ** 2
 
 
+class MixedSeparableConv2d(nn.Module):
+    def __init__(self, n_ch, bias=False):
+        super(MixedSeparableConv2d, self).__init__()
+        self.n_ch = n_ch
+        self.conv3 = nn.Conv2d(n_ch // 4, n_ch // 4, 3, padding=1, groups=n_ch // 4, bias=bias)
+        self.conv5 = nn.Conv2d(n_ch // 4, n_ch // 4, 5, padding=2, groups=n_ch // 4, bias=bias)
+        self.conv7 = nn.Conv2d(n_ch // 4, n_ch // 4, 7, padding=3, groups=n_ch // 4, bias=bias)
+        self.conv9 = nn.Conv2d(n_ch // 4, n_ch // 4, 9, padding=4, groups=n_ch // 4, bias=bias)
+
+    def forward(self, x):
+        return torch.cat((self.conv3(x[:, :self.n_ch // 4, ...]),
+                          self.conv5(x[:, self.n_ch // 4:self.n_ch // 2, ...]),
+                          self.conv7(x[:, self.n_ch // 2:self.n_ch * 3 // 4, ...]),
+                          self.conv9(x[:, self.n_ch * 3 // 4:, ...])), dim=1)
+
+
 class SeparableCBAM(nn.Module):
     def __init__(self, n_ch, crop_boundary=None):
         super(SeparableCBAM, self).__init__()
-        self.spatial_attention = nn.Sequential(nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch),
+        bias = True
+        self.spatial_attention = nn.Sequential(nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch, bias=bias),
                                                nn.ReLU(True),
-                                               nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch),
+                                               nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch, bias=bias),
                                                nn.ReLU(True),
-                                               nn.PixelShuffle(4),
-                                               nn.Conv2d(n_ch // 16, n_ch // 16, 7, padding=3, groups=n_ch // 16),
+                                               nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch, bias=bias),
                                                nn.ReLU(True),
-                                               nn.Conv2d(n_ch // 16, 1, 1, bias=False))
+                                               nn.PixelShuffle(2),
+                                               nn.Conv2d(n_ch // 4, n_ch // 4, 9, padding=4, groups=n_ch // 4),
+                                               nn.ReLU(True),
+                                               nn.PixelShuffle(2),
+                                               nn.Conv2d(n_ch // 16, n_ch // 16, 9, padding=4,  groups=n_ch // 16),
+                                               nn.ReLU(True),
+                                               nn.PixelShuffle(2),
+                                               nn.Conv2d(n_ch // 64, n_ch // 64, 9, padding=4, groups=n_ch // 64),
+                                               nn.ReLU(True),
+                                               nn.Conv2d(n_ch // 64, 1, 1, bias=True))
+
         if crop_boundary:
             self.spatial_attention.add_module("Crop", Crop(crop_boundary))
 
     def forward(self, x):
         # discussion
+
         return x * torch.sigmoid(self.spatial_attention(x))
 
 
