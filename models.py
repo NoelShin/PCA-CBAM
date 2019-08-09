@@ -125,8 +125,8 @@ class ResidualNetwork(nn.Module):
             network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0))]  # 28
-            network += [RB(512, 512, bottle_neck_ch=128, crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0)) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, crop_boundary=(4, 4) if dataset == "ImageNet" else (0, 0))]  # 28
+            network += [RB(512, 512, bottle_neck_ch=128, crop_boundary=(4, 4) if dataset == "ImageNet" else (0, 0)) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
 
             network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2, crop_boundary=(2, 2) if dataset == "ImageNet" else (0, 0))]  # 14
