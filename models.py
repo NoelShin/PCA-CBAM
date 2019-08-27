@@ -2,12 +2,12 @@ from functools import partial
 import torch.nn as nn
 import torch.nn.functional as F
 from attention_modules import BAM, CBAM, SqueezeExcitationBlock
-from scbam import SeparableCBAM
+from scbam import SeparableCBAM, DBAM, Crop
 
 
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, first_conv_stride=1, attention='CBAM',
-                 crop_boundary=(0, 0)):
+                 crop_boundary=(0, 0), conversion_factor=4, dilation=2, kernel_size=3, padding=0):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -32,11 +32,14 @@ class ResidualBlock(nn.Module):
         if attention == 'CBAM':
             block += [CBAM(output_ch)]
 
+        elif attention == 'DBAM':
+            block += [DBAM(output_ch, kernel_size, dilation, conversion_factor)]
+
         elif attention == 'SE':
             block += [SqueezeExcitationBlock(output_ch)]
 
         elif attention == 'SeparableCBAM':
-            block += [SeparableCBAM(output_ch, crop_boundary)]
+            block += [SeparableCBAM(output_ch, crop_boundary, conversion_factor, padding=padding)]
 
         if input_ch != output_ch:
             side_block = [nn.Conv2d(input_ch, output_ch, 1, stride=first_conv_stride, bias=False),
@@ -121,20 +124,36 @@ class ResidualNetwork(nn.Module):
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(512, n_classes)]
 
         elif n_layers == 50:
-            network += [RB(64, 256, bottle_neck_ch=64)]
-            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
+            conversion_factor = 2
+            dilation = 2
+            network += [RB(64, 256, bottle_neck_ch=64,
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=15)]
+            network += [RB(256, 256, bottle_neck_ch=64,
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=15) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, crop_boundary=(4, 4) if dataset == "ImageNet" else (0, 0))]  # 28
-            network += [RB(512, 512, bottle_neck_ch=128, crop_boundary=(4, 4) if dataset == "ImageNet" else (0, 0)) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2,
+                           crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0),
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=8)]  # 28
+            network += [RB(512, 512, bottle_neck_ch=128,
+                           crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0),
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=8) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
 
-            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2, crop_boundary=(2, 2) if dataset == "ImageNet" else (0, 0))]  # 14
-            network += [RB(1024, 1024, bottle_neck_ch=256, crop_boundary=(2, 2) if dataset == "ImageNet" else (0, 0)) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2,
+                           crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0),
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=5)]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=256, crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0),
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=5) for _ in range(5)]
             network += [BAM(1024)] if attention == 'BAM' else []
 
-            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, crop_boundary=(1, 1) if dataset == "ImageNet" else (0, 0))]
-            network += [RB(2048, 2048, bottle_neck_ch=512, crop_boundary=(1, 1) if dataset == "ImageNet" else (0, 0)) for _ in range(2)]
+            # network += [Crop((2, 2))]
+            network += [nn.ZeroPad2d((0, 1, 0, 1))]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2,
+                           crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0),
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=3)]
+            network += [RB(2048, 2048, bottle_neck_ch=512, crop_boundary=(0, 0) if dataset == "ImageNet" else (0, 0),
+                           conversion_factor=conversion_factor, dilation=dilation, kernel_size=3) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 

@@ -7,7 +7,7 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_ids', type=str, default='1')
+        parser.add_argument('--gpu_ids', type=str, default='2')
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -55,7 +55,7 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_triple_consec_c9'
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_quadro(SR)_3(s2)5(d2)x2'
         model_name = model_name.strip('_')
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
@@ -86,7 +86,7 @@ class BaseOptions(object):
                     args.resume = True
                     best_top1 = {'Epoch': 0, 'Top1': 100.0}
                     best_top5 = {'Epoch': 0, 'Top1': 100.0}
-
+                    epoch_recent = 0
                     with open(args.path_log_analysis, 'r') as log:
                         for i, row in enumerate(reader(log)):
                             if i == 0:
@@ -96,6 +96,7 @@ class BaseOptions(object):
                                     best_top1.update({'Epoch': row[1], 'Top1': float(row[4])})
                                 if int(row[2]) > int(best_top5['Epoch']):
                                     best_top5.update({'Epoch': row[2], 'Top5': float(row[5])})
+                            epoch_recent = int(row[0])
                         args.epoch_top1 = int(best_top1['Epoch'])
                         args.top1 = best_top1['Top1']
 
@@ -103,13 +104,19 @@ class BaseOptions(object):
                         args.top5 = best_top5['Top5']
                         log.close()
 
-                    if args.epoch_top1 > args.epoch_top5:
-                        args.epoch_recent = args.epoch_top1
+                    if os.path.isfile(os.path.join(args.dir_model, 'latest.pt')):
+                        args.epoch_recent = epoch_recent
                         args.path_model = os.path.join(args.dir_model, 'top1_best.pt')
+                        print("Training resumes at epoch", args.epoch_recent)
+
                     else:
-                        args.epoch_recent = args.epoch_top5
-                        args.path_model = os.path.join(args.dir_model, 'top5_best.pt')
-                    print("Training resumes at epoch", args.epoch_recent)
+                        if args.epoch_top1 > args.epoch_top5:
+                            args.epoch_recent = args.epoch_top1
+                            args.path_model = os.path.join(args.dir_model, 'top1_best.pt')
+                        else:
+                            args.epoch_recent = args.epoch_top5
+                            args.path_model = os.path.join(args.dir_model, 'top5_best.pt')
+                        print("Training resumes at epoch", args.epoch_recent)
 
                 else:
                     NotImplementedError
@@ -128,4 +135,7 @@ class BaseOptions(object):
                 log.close()
 
         return args
-    
+
+
+if __name__ == '__main__':
+    opt = BaseOptions().parse()

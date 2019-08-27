@@ -1,5 +1,5 @@
 def cal_top1_and_top5(output, label):
-    batch_size = output.shape[0]
+    batch_size = float(output.shape[0])
     _, index = output.topk(5, dim=1, largest=True, sorted=True)  # index shape: Bx5
     correct = index.eq(label.view(-1, 1).expand_as(index))  # correct shape: Bx5
     top1 = correct[:, :1].float().sum().mul_(100. / batch_size)

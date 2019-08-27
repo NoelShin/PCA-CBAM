@@ -1,3 +1,4 @@
+from functools import partial
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -35,49 +36,90 @@ class GlobalVarPool2d(nn.Module):
 
 
 class MixedSeparableConv2d(nn.Module):
-    def __init__(self, n_ch, bias=False):
+    def __init__(self, n_ch, stride=1, bias=True):
         super(MixedSeparableConv2d, self).__init__()
         self.n_ch = n_ch
-        self.conv3 = nn.Conv2d(n_ch // 4, n_ch // 4, 3, padding=1, groups=n_ch // 4, bias=bias)
-        self.conv5 = nn.Conv2d(n_ch // 4, n_ch // 4, 5, padding=2, groups=n_ch // 4, bias=bias)
-        self.conv7 = nn.Conv2d(n_ch // 4, n_ch // 4, 7, padding=3, groups=n_ch // 4, bias=bias)
-        self.conv9 = nn.Conv2d(n_ch // 4, n_ch // 4, 9, padding=4, groups=n_ch // 4, bias=bias)
+        self.conv3 = nn.Conv2d(n_ch // 4, n_ch // 4, 3, stride=stride, padding=1, groups=n_ch // 4, bias=bias)
+        self.conv5 = nn.Conv2d(n_ch // 4, n_ch // 4, 5, stride=stride, padding=2, groups=n_ch // 4, bias=bias)
+        self.conv7 = nn.Conv2d(n_ch // 4, n_ch // 4, 7, stride=stride, padding=3, groups=n_ch // 4, bias=bias)
+        self.conv9 = nn.Conv2d(n_ch // 4, n_ch // 4, 9, stride=stride, padding=4, groups=n_ch // 4, bias=bias)
 
     def forward(self, x):
         return torch.cat((self.conv3(x[:, :self.n_ch // 4, ...]),
                           self.conv5(x[:, self.n_ch // 4:self.n_ch // 2, ...]),
                           self.conv7(x[:, self.n_ch // 2:self.n_ch * 3 // 4, ...]),
-                          self.conv9(x[:, self.n_ch * 3 // 4:, ...])), dim=1)
+                          self.conv9(x[:, self.n_ch * 3 // 4:, ...])),
+                         dim=1)
 
 
 class SeparableCBAM(nn.Module):
-    def __init__(self, n_ch, crop_boundary=None):
+    def __init__(self, n_ch, crop_boundary=None, conversion_factor=4, padding=0):
         super(SeparableCBAM, self).__init__()
-        bias = True
-        self.spatial_attention = nn.Sequential(nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch, bias=bias),
-                                               nn.ReLU(True),
-                                               nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch, bias=bias),
-                                               nn.ReLU(True),
-                                               nn.Conv2d(n_ch, n_ch, 3, padding=1, stride=2, groups=n_ch, bias=bias),
-                                               nn.ReLU(True),
-                                               nn.PixelShuffle(2),
-                                               nn.Conv2d(n_ch // 4, n_ch // 4, 9, padding=4, groups=n_ch // 4),
-                                               nn.ReLU(True),
-                                               nn.PixelShuffle(2),
-                                               nn.Conv2d(n_ch // 16, n_ch // 16, 9, padding=4,  groups=n_ch // 16),
-                                               nn.ReLU(True),
-                                               nn.PixelShuffle(2),
-                                               nn.Conv2d(n_ch // 64, n_ch // 64, 9, padding=4, groups=n_ch // 64),
-                                               nn.ReLU(True),
-                                               nn.Conv2d(n_ch // 64, 1, 1, bias=True))
+        self.ccm = nn.Sequential()
+        for i in range(conversion_factor):
+            self.ccm.add_module("SConv{}".format(i), nn.Conv2d(n_ch, n_ch, 3,
+                                                               padding=1, stride=2, groups=n_ch))
+            # self.ccm.add_module("P{}".format(i), Print())
+            self.ccm.add_module("Act1{}".format(i), nn.ReLU(True))
+
+        # for i in range(conversion_factor):
+            self.ccm.add_module("PN{}".format(i), nn.PixelShuffle(2))
+            n_ch //= 4
+
+            self.ccm.add_module("Conv0{}".format(i), nn.Conv2d(n_ch, n_ch, 5, padding=4,
+                                                               dilation=2, groups=n_ch))
+            self.ccm.add_module("Act2{}".format(i), nn.ReLU(True))
+
+            self.ccm.add_module("Conv1{}".format(i), nn.Conv2d(n_ch, n_ch, 5, padding=4,
+                                                               dilation=2, groups=n_ch))
+            self.ccm.add_module("Act3{}".format(i), nn.ReLU(True))
+            # self.ccm.add_module("AddActConv{}".format(i), AddActConv(n_ch, 3, 8))
 
         if crop_boundary:
-            self.spatial_attention.add_module("Crop", Crop(crop_boundary))
+            self.ccm.add_module("Crop", Crop(crop_boundary))
+
+        self.ccm.add_module("1x1Conv", nn.Conv2d(n_ch, 1, 1))
 
     def forward(self, x):
         # discussion
+        return x * torch.sigmoid(self.ccm(x))
 
-        return x * torch.sigmoid(self.spatial_attention(x))
+
+class DBAM(nn.Module):
+    def __init__(self, n_ch, kernel_size, dilation, conversion_factor):
+        super(DBAM, self).__init__()
+        dbam = []
+        for i in range(conversion_factor):
+            dbam += [nn.Conv2d(n_ch, n_ch, kernel_size, dilation=dilation, groups=n_ch),
+                     nn.ReLU(True),
+                     nn.PixelShuffle(2)]
+            n_ch //= 4
+
+        dbam += [nn.Conv2d(n_ch, 1, 1)]
+        self.dbam = nn.Sequential(*dbam)
+
+    def forward(self, x):
+        return x * torch.sigmoid(self.dbam(x))
+
+
+class AddActConv(nn.Module):
+    def __init__(self, n_ch, kernel_size, padding):
+        super(AddActConv, self).__init__()
+        self.act_conv = nn.Sequential(nn.Conv2d(n_ch, n_ch, kernel_size, padding=padding, dilation=8, groups=n_ch, bias=True),
+                                      nn.ReLU(True),
+                                      nn.Conv2d(n_ch, n_ch, kernel_size, padding=padding, dilation=8, groups=n_ch, bias=True))
+
+    def forward(self, x):
+        return x + self.act_conv(x)
+
+
+class ChannelDuplication(nn.Module):
+    def __init__(self, factor):
+        super(ChannelDuplication, self).__init__()
+        self.factor = factor
+
+    def forward(self, x):
+        return torch.cat(tuple(x for _ in range(self.factor)), dim=1)
 
 
 class View(nn.Module):
@@ -106,3 +148,9 @@ class Crop(nn.Module):
                 return x[:, :, :-self.y, :-self.x]
         else:
             return x
+
+
+class Print(nn.Module):
+    def forward(self, x):
+        print(x.shape)
+        return x

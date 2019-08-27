@@ -83,15 +83,18 @@ if __name__ == '__main__':
         state_dict = torch.load(opt.path_model)
         model.load_state_dict(state_dict['state_dict'])
         optim.load_state_dict(state_dict['optimizer'])
-        lr_scheduler.load_state_dict(state_dict['lr'])
+        lr_scheduler.load_state_dict(state_dict['lr_scheduler'])
 
         dict_best_top1.update({'Epoch': opt.epoch_top1, 'Top1': opt.top1})
         dict_best_top5.update({'Epoch': opt.epoch_top5, 'Top5': opt.top5})
 
     st = datetime.now()
     iter_total = 0
+    top1_hist = list(100 for i in range(100))
+    top5_hist = list(100 for i in range(100))  # to see 100 latest top5 error
     for epoch in range(opt.epoch_recent, opt.epochs):
         list_loss = list()
+        model.train()
         for input, label in tqdm(data_loader):
             iter_total += 1
             input, label = input.to(device), label.to(device)
@@ -104,17 +107,20 @@ if __name__ == '__main__':
             optim.step()
 
             top1, top5 = cal_top1_and_top5(output, label)
+            top1_hist[iter_total % 100] = np.float(top1)
+            top5_hist[iter_total % 100] = np.float(top5)
 
             list_loss.append(loss.detach().item())
 
             if iter_total % opt.iter_report == 0:
-                print("Iteration: {}, Top1: {:.3f}, Top5: {:.3f} Loss: {:.4f}"
-                      .format(iter_total, top1, top5, loss.detach().item()))
+                print("Iteration: {}, Top1: {:.3f}, Top5: {:.3f} Loss: {:.4f} Top1_hist: {:.3f} Top5_hist: {:.3f}"
+                      .format(iter_total, top1, top5, loss.detach().item(), np.mean(top1_hist), np.mean(top5_hist)))
 
             if opt.debug:
                 break
 
         with torch.no_grad():
+            model.eval()
             list_top1, list_top5 = list(), list()
 
             for input, label in tqdm(test_data_loader):
@@ -126,22 +132,21 @@ if __name__ == '__main__':
                 list_top1.append(top1.cpu().numpy())
                 list_top5.append(top5.cpu().numpy())
 
+            state = {'epoch': epoch + 1,
+                     'lr': lr_scheduler.state_dict(),
+                     'lr_scheduler': lr_scheduler.state_dict(),
+                     'state_dict': model.state_dict(),
+                     'optimizer': optim.state_dict()}
+            torch.save(state, os.path.join(opt.dir_model, 'latest.pt'.format(epoch + 1)))
+
             avg_top1, avg_top5 = np.mean(list_top1), np.mean(list_top5)
 
             if avg_top1 < dict_best_top1['Top1']:
                 dict_best_top1.update({'Epoch': epoch + 1, 'Top1': avg_top1})
-                state = {'epoch': epoch + 1,
-                         'lr': lr_scheduler.state_dict(),
-                         'state_dict': model.state_dict(),
-                         'optimizer': optim.state_dict()}
                 torch.save(state, os.path.join(opt.dir_model, 'top1_best.pt'.format(epoch + 1)))
 
             if avg_top5 < dict_best_top5['Top5']:
                 dict_best_top5.update({'Epoch': epoch + 1, 'Top5': avg_top5})
-                state = {'epoch': epoch + 1,
-                         'lr': lr_scheduler.state_dict(),
-                         'state_dict': model.state_dict(),
-                         'optimizer': optim.state_dict()}
                 torch.save(state, os.path.join(opt.dir_model, 'top5_best.pt'.format(epoch + 1)))
 
             with open(os.path.join(opt.dir_analysis, 'log.txt'), 'a') as log:
