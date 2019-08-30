@@ -1,18 +1,22 @@
 if __name__ == '__main__':
     import os
+    import random
     import torch
     import torch.nn as nn
     from torch.utils.data import DataLoader
-    from torch.optim.lr_scheduler import MultiStepLR
     import numpy as np
     from options import BaseOptions
     from pipeline import CustomImageNet1K
-    from utils import cal_top1_and_top5
+    from utils import adjust_lr, cal_top1_and_top5
     from tqdm import tqdm
     from datetime import datetime
 
     opt = BaseOptions().parse()
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu_ids
+
+    random.seed(opt.manual_seed)
+    torch.manual_seed(opt.manual_seed)
+    torch.cuda.manual_seed_all(opt.manual_seed)
 
     dataset_name = opt.dataset
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -48,12 +52,23 @@ if __name__ == '__main__':
         from models import ResidualNetwork
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
-                                attention=opt.attention_module)
-        model = nn.DataParallel(model).to(device)
-    else:
+                                attention=opt.attention_module,
+                                conversion_factor=opt.conversion_factor)
+
+    elif backbone_network == 'ResNext':
+        from models import ResNext
+        model = ResNext(n_layers=n_layers,
+                        dataset=opt.dataset,
+                        attention=opt.attention_module,
+                        conversion_factor=opt.conversion_factor)
         """
         Other models
         """
+
+    elif backbone_network == 'WideResNet':
+        from models import WideResNet
+        model = WideResNet(dataset=opt.dataset, attention=opt.attention_module, conversion_factor=opt.conversion_factor)
+    model = nn.DataParallel(model).to(device)
 
     criterion = nn.CrossEntropyLoss()
     if dataset_name == 'CIFAR100':
@@ -61,14 +76,14 @@ if __name__ == '__main__':
                                 lr=opt.lr,
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
-        lr_scheduler = MultiStepLR(optim, milestones=[150, 225], gamma=0.1)
+        milestones = [150, 225]
 
     elif dataset_name == 'ImageNet':
         optim = torch.optim.SGD(model.parameters(),
                                 lr=opt.lr,
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
-        lr_scheduler = MultiStepLR(optim, milestones=[30, 60], gamma=0.1)
+        milestones = [30, 60]
 
     else:
         """
@@ -83,7 +98,6 @@ if __name__ == '__main__':
         state_dict = torch.load(opt.path_model)
         model.load_state_dict(state_dict['state_dict'])
         optim.load_state_dict(state_dict['optimizer'])
-        lr_scheduler.load_state_dict(state_dict['lr_scheduler'])
 
         dict_best_top1.update({'Epoch': opt.epoch_top1, 'Top1': opt.top1})
         dict_best_top5.update({'Epoch': opt.epoch_top5, 'Top5': opt.top5})
@@ -93,6 +107,7 @@ if __name__ == '__main__':
     top1_hist = list(100 for i in range(100))
     top5_hist = list(100 for i in range(100))  # to see 100 latest top5 error
     for epoch in range(opt.epoch_recent, opt.epochs):
+        adjust_lr(optim, epoch, opt.lr, milestones=milestones, gamma=0.1)
         list_loss = list()
         model.train()
         for input, label in tqdm(data_loader):
@@ -119,6 +134,13 @@ if __name__ == '__main__':
             if opt.debug:
                 break
 
+        with open(os.path.join(opt.dir_analysis, 'train.txt'), 'a') as log:
+            log.write(str(epoch + 1) + ', ' +
+                      str(loss.detach().item()) + ', ' +
+                      str(top1.item()) + ', ' +
+                      str(top5.item()) + '\n')
+            log.close()
+
         with torch.no_grad():
             model.eval()
             list_top1, list_top5 = list(), list()
@@ -133,8 +155,6 @@ if __name__ == '__main__':
                 list_top5.append(top5.cpu().numpy())
 
             state = {'epoch': epoch + 1,
-                     'lr': lr_scheduler.state_dict(),
-                     'lr_scheduler': lr_scheduler.state_dict(),
                      'state_dict': model.state_dict(),
                      'optimizer': optim.state_dict()}
             torch.save(state, os.path.join(opt.dir_model, 'latest.pt'.format(epoch + 1)))
@@ -160,7 +180,5 @@ if __name__ == '__main__':
 
         if opt.debug:
             break
-
-        lr_scheduler.step()
 
     print("Total time taken: ", datetime.now() - st)

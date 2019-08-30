@@ -7,7 +7,8 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_ids', type=str, default='2')
+        parser.add_argument('--gpu_ids', type=str, default='0')
+        parser.add_argument('--manual_seed', type=int, default=0)
 
         # Backbone options
         parser.add_argument('--backbone_network', type=str, default='ResNet',
@@ -15,11 +16,13 @@ class BaseOptions(object):
         parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
 
         # Attention options
-        parser.add_argument('--attention_module', type=str, default='SeparableCBAM',
-                            help='Choose among [BAM, CBAM, None, SE, SeparableCBAM]')
+        parser.add_argument('--attention_module', type=str, default='CCM',
+                            help='Choose among [BAM, CBAM, None, SE, CCM]')
+        parser.add_argument('--conversion_factor', type=int, default=1)
 
-        parser.add_argument('--dataset', type=str, default='ImageNet', help='Dataset name. Choose among'
+        parser.add_argument('--dataset', type=str, default='CIFAR100', help='Dataset name. Choose among'
                                                                             '[CIFAR100, ImageNet, MSCOCO, VOC2007]')
+
         parser.add_argument('--epoch_recent', type=int, default=0)
         parser.add_argument('--dir_checkpoints', type=str, default='./checkpoints')
         parser.add_argument('--dir_dataset', type=str, default='/DATA/RAID/Noel/Datasets/ImageNet-1K')
@@ -34,7 +37,7 @@ class BaseOptions(object):
     @staticmethod
     def define_hyper_params(args):
         if args.dataset == 'ImageNet':
-            args.batch_size = 64  # default 256
+            args.batch_size = 128  # default 256
             args.dir_dataset = '/userhome/shin_g/Desktop/Projects/SCBAM_1/datasets/ImageNet1K'
             args.epochs = 90
             args.lr = 0.1
@@ -55,7 +58,8 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_quadro(SR)_3(s2)5(d2)x2'
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_single_3(s2)5(d2)x2_0'#'_triple(SR)_3(s2)5(d2)_0'
+        #model_name = args.backbone_network + '28-8_SE_0'
         model_name = model_name.strip('_')
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
@@ -67,6 +71,10 @@ class BaseOptions(object):
         if os.path.isfile(args.path_log_analysis):
             answer = input("Already existed log {}. Do you want to overwrite it? [y/n] : ".format(model_name))
             if answer == 'y':
+                with open(os.path.join(args.dir_analysis, 'train.txt'), 'wt') as log:
+                    log.write('Epoch, Loss, Top1, Top5\n')
+                    log.close()
+
                 with open(args.path_log_analysis, 'wt') as log:
                     log.write('Epoch, Epoch_best_top1,  Epoch_best_top5, Training_loss, Top1_error, Top5_error\n')
                     log.close()
@@ -121,6 +129,10 @@ class BaseOptions(object):
                 else:
                     NotImplementedError
         else:
+            with open(os.path.join(args.dir_analysis, 'train.txt'), 'wt') as log:
+                log.write('Epoch, Loss, Top1, Top5\n')
+                log.close()
+
             with open(args.path_log_analysis, 'wt') as log:
                 log.write('Epoch, Epoch_best_top1,  Epoch_best_top5, Training_loss, Top1_error, Top5_error\n')
                 log.close()

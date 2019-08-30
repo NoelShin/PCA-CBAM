@@ -27,14 +27,6 @@ class ChannelAxisPool(nn.Module):
             return torch.var(x, dim=1, keepdim=True)
 
 
-class GlobalVarPool2d(nn.Module):
-    def __init__(self):
-        super(GlobalVarPool2d, self).__init__()
-
-    def forward(self, x):
-        return torch.mean(x ** 2, dim=(2, 3), keepdim=True) - torch.mean(x, dim=(2, 3), keepdim=True) ** 2
-
-
 class MixedSeparableConv2d(nn.Module):
     def __init__(self, n_ch, stride=1, bias=True):
         super(MixedSeparableConv2d, self).__init__()
@@ -52,14 +44,13 @@ class MixedSeparableConv2d(nn.Module):
                          dim=1)
 
 
-class SeparableCBAM(nn.Module):
-    def __init__(self, n_ch, crop_boundary=None, conversion_factor=4, padding=0):
-        super(SeparableCBAM, self).__init__()
+class CCM(nn.Module):
+    def __init__(self, n_ch, conversion_factor=4):
+        super(CCM, self).__init__()
         self.ccm = nn.Sequential()
         for i in range(conversion_factor):
             self.ccm.add_module("SConv{}".format(i), nn.Conv2d(n_ch, n_ch, 3,
                                                                padding=1, stride=2, groups=n_ch))
-            # self.ccm.add_module("P{}".format(i), Print())
             self.ccm.add_module("Act1{}".format(i), nn.ReLU(True))
 
         # for i in range(conversion_factor):
@@ -73,10 +64,9 @@ class SeparableCBAM(nn.Module):
             self.ccm.add_module("Conv1{}".format(i), nn.Conv2d(n_ch, n_ch, 5, padding=4,
                                                                dilation=2, groups=n_ch))
             self.ccm.add_module("Act3{}".format(i), nn.ReLU(True))
-            # self.ccm.add_module("AddActConv{}".format(i), AddActConv(n_ch, 3, 8))
 
-        if crop_boundary:
-            self.ccm.add_module("Crop", Crop(crop_boundary))
+            # self.ccm.add_module("Act3{}".format(i), nn.ReLU(True))
+            # self.ccm.add_module("AddActConv{}".format(i), AddActConv(n_ch, 3, 8))
 
         self.ccm.add_module("1x1Conv", nn.Conv2d(n_ch, 1, 1))
 
