@@ -5,6 +5,70 @@ from attention_modules import BAM, CBAM, SqueezeExcitationBlock
 from scbam import CCM, DBAM
 
 
+class BasicConv(nn.Module):
+    def __init__(self, input_ch, output_ch, kernel_size, padding=0, stride=1, use_batchnorm=True, groups=1):
+        super(BasicConv, self).__init__()
+        self.conv = nn.Sequential(nn.Conv2d(input_ch, output_ch, kernel_size, padding, stride,
+                                            bias=False if use_batchnorm else True, groups=groups),
+                                     nn.BatchNorm2d(output_ch),
+                                     nn.ReLU(True))
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+class MobileNet(nn.Module):
+    def __init__(self, width_multiplier=1.0, input_ch=3, init_ch=32, n_classes=1000):
+        super(MobileNet, self).__init__()
+        n_ch = int(init_ch * width_multiplier)
+        self.network = nn.Sequential(BasicConv(input_ch, n_ch, 3, padding=1, stride=2),
+
+                                     BasicConv(n_ch, n_ch, 3, padding=1, groups=n_ch),
+                                     BasicConv(n_ch, 2 * n_ch, 1),
+
+                                     BasicConv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch),
+                                     BasicConv(2 * n_ch, 4 * n_ch, 1),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 1),
+
+                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
+                                     BasicConv(4 * n_ch, 8 * n_ch, 1),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 1),
+
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
+                                     BasicConv(8 * n_ch, 16 * n_ch, 1),
+
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 32 * n_ch, 1),
+                                     BasicConv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch),
+                                     BasicConv(32 * n_ch, 32 * n_ch, 1),
+
+                                     nn.AdaptiveAvgPool2d((1, 1)),
+                                     View(-1),
+                                     nn.Linear(32 * n_ch, n_classes))
+
+        self.apply(init_weights)
+        print(self)
+
+        n_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print("The number of learnable parameters : {}".format(n_params))
+
+    def forward(self, x):
+        return self.network(x)
+
+
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, pre_activation=False, first_conv_stride=1, n_groups=1,
                  attention='CBAM', conversion_factor=4, crop_boundary=(0, 0)):
@@ -348,11 +412,12 @@ def init_weights(module):
 
 
 if __name__ == '__main__':
-    resnet = ResidualNetwork(50, dataset='ImageNet', attention='CCM', conversion_factor=4)
+    #resnet = ResidualNetwork(50, dataset='ImageNet', attention='CCM', conversion_factor=4)
     #resnext = ResNext(50, dataset='ImageNet', attention='None')
     # wrn = WideResNet(28, dataset='CIFAR100', attention='None')
+    mobilenet = MobileNet()
 
     from ptflops import get_model_complexity_info
 
-    flops, params = get_model_complexity_info(resnet, (3, 224, 224), as_strings=False, print_per_layer_stat=True)
+    flops, params = get_model_complexity_info(mobilenet, (3, 224, 224), as_strings=False, print_per_layer_stat=True)
     print('GFlops:  ', flops / (1.024 ** 3), '# Params: ', params)
