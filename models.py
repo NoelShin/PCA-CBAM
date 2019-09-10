@@ -2,12 +2,12 @@ from functools import partial
 import torch.nn as nn
 import torch.nn.functional as F
 from attention_modules import BAM, CBAM, SqueezeExcitationBlock
-from scbam import CCM
+from scbam import CCM, DBAM
 
 
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, pre_activation=False, first_conv_stride=1, n_groups=1,
-                 attention='CBAM', conversion_factor=4):
+                 attention='CBAM', conversion_factor=4, crop_boundary=(0, 0)):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -41,7 +41,8 @@ class ResidualBlock(nn.Module):
                 block = [nn.Conv2d(input_ch, bottle_neck_ch, 1, bias=False),  # Caffe version has stride 2 here
                          norm(bottle_neck_ch),
                          act]
-                block += [nn.Conv2d(bottle_neck_ch, bottle_neck_ch, 3, padding=1, stride=first_conv_stride, groups=n_groups,
+                block += [nn.Conv2d(bottle_neck_ch, bottle_neck_ch, 3, padding=1, stride=first_conv_stride,
+                                    groups=n_groups,
                                     bias=False),  # PyTorch version has stride 2 here
                           norm(bottle_neck_ch),
                           act]
@@ -49,7 +50,8 @@ class ResidualBlock(nn.Module):
                           norm(output_ch)]
 
             else:
-                block = [nn.Conv2d(input_ch, output_ch, 3, stride=first_conv_stride, groups=n_groups, padding=1, bias=False),
+                block = [nn.Conv2d(input_ch, output_ch, 3, stride=first_conv_stride, groups=n_groups, padding=1,
+                                   bias=False),
                          norm(output_ch),
                          act]
                 block += [nn.Conv2d(output_ch, output_ch, 3, padding=1, bias=False),
@@ -62,7 +64,7 @@ class ResidualBlock(nn.Module):
             block += [SqueezeExcitationBlock(output_ch)]
 
         elif attention == 'CCM':
-            block += [CCM(output_ch, conversion_factor=conversion_factor)]
+            block += [CCM(output_ch, conversion_factor=conversion_factor, crop_boundary=crop_boundary)]
 
         if input_ch != output_ch:
             side_block = [nn.Conv2d(input_ch, output_ch, 1, stride=first_conv_stride, bias=False),
@@ -96,6 +98,12 @@ class ResidualNetwork(nn.Module):
                        nn.MaxPool2d(kernel_size=3, stride=2, padding=1)]
             n_classes = 1000
 
+        elif dataset =='CIFAR10':
+            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
+                       norm(64),
+                       act]
+            n_classes = 10
+
         elif dataset == 'CIFAR100':
             network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
                        norm(64),
@@ -121,7 +129,7 @@ class ResidualNetwork(nn.Module):
                         RB(256, 256)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            if dataset == 'ImageNet' and attention == 'SeparableCBAM':
+            if dataset == 'ImageNet' and attention == 'CCM':
                 network += [nn.ZeroPad2d((0, 1, 0, 1))]
 
             network += [RB(256, 512, first_conv_stride=2),
@@ -151,19 +159,22 @@ class ResidualNetwork(nn.Module):
             network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]  # 28
-            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
+            # if dataset == 'ImageNet' and attention == 'CCM':
+            #     network += [nn.ZeroPad2d(4)]
+
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, crop_boundary=(0, 0))]  # 28
+            network += [RB(512, 512, bottle_neck_ch=128, crop_boundary=(0, 0)) for _ in range(3)]
             network += [BAM(512)] if attention == 'BAM' else []
 
-            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]  # 14
-            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2, crop_boundary=(0, 0))]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=256, crop_boundary=(0, 0)) for _ in range(5)]
             network += [BAM(1024)] if attention == 'BAM' else []
 
-            if dataset == 'ImageNet' and attention == 'SeparableCBAM':
-                network += [nn.ZeroPad2d((0, 1, 0, 1))]
+            # if dataset == 'ImageNet' and attention == 'CCM':
+            #     network += [nn.ZeroPad2d((0, 1, 0, 1))]
 
-            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
-            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, crop_boundary=(0, 0))]
+            network += [RB(2048, 2048, bottle_neck_ch=512, crop_boundary=(0, 0)) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
@@ -180,7 +191,7 @@ class ResidualNetwork(nn.Module):
             network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(22)]
             network += [BAM(256)] if attention == 'BAM' else []
 
-            if dataset == 'ImageNet' and attention == 'SeparableCBAM':
+            if dataset == 'ImageNet' and attention == 'CCM':
                 network += [nn.ZeroPad2d((0, 1, 0, 1))]
 
             network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
@@ -271,7 +282,7 @@ class ResNext(nn.Module):
 
 
 class WideResNet(nn.Module):
-    def __init__(self, n_layers=28, widening_factor=8, dataset='ImageNet', attention='None', conversion_factor=4):
+    def __init__(self, n_layers=18, widening_factor=1.5, dataset='ImageNet', attention='None', conversion_factor=4):
         super(WideResNet, self).__init__()
         assert (n_layers - 4) % 6 == 0
         N = (n_layers - 4) // 6
@@ -296,9 +307,14 @@ class WideResNet(nn.Module):
         network += [RB(32 * widening_factor, 64 * widening_factor)]
         for _ in range(N-1):
             network += [RB(64 * widening_factor, 64 * widening_factor)]
-        network += [nn.BatchNorm2d(64 * widening_factor), nn.ReLU(True)]
 
-        network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(64 * widening_factor, n_classes)]
+        network += [nn.BatchNorm2d(64 * widening_factor),
+                    nn.ReLU(True)]
+
+        network += [nn.AdaptiveAvgPool2d((1, 1)),
+                    View(-1),
+                    nn.Linear(64 * widening_factor, n_classes)]
+
         self.network = nn.Sequential(*network)
         self.apply(init_weights)
         print(self)
@@ -332,11 +348,11 @@ def init_weights(module):
 
 
 if __name__ == '__main__':
-    # resnet = ResidualNetwork(50, dataset='CIFAR100', attention='CBAM')
-    # resnext = ResNext(50, dataset='CIFAR100', attention='None')
-    wrn = WideResNet(28, dataset='CIFAR100', attention='None')
+    resnet = ResidualNetwork(50, dataset='ImageNet', attention='CCM', conversion_factor=4)
+    #resnext = ResNext(50, dataset='ImageNet', attention='None')
+    # wrn = WideResNet(28, dataset='CIFAR100', attention='None')
 
     from ptflops import get_model_complexity_info
 
-    flops, params = get_model_complexity_info(wrn, (3, 32, 32), as_strings=False, print_per_layer_stat=True)
+    flops, params = get_model_complexity_info(resnet, (3, 224, 224), as_strings=False, print_per_layer_stat=True)
     print('GFlops:  ', flops / (1.024 ** 3), '# Params: ', params)

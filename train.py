@@ -23,7 +23,12 @@ if __name__ == '__main__':
 
     torch.backends.cudnn.benchmark = True
 
-    if dataset_name == 'CIFAR100':
+    if dataset_name == 'CIFAR10':
+        from pipeline import CustomCIFAR10
+        dataset = CustomCIFAR10(opt, val=False)
+        test_dataset = CustomCIFAR10(opt, val=True)
+
+    elif dataset_name == 'CIFAR100':
         from pipeline import CustomCIFAR100
         dataset = CustomCIFAR100(opt, val=False)
         test_dataset = CustomCIFAR100(opt, val=True)
@@ -71,7 +76,7 @@ if __name__ == '__main__':
     model = nn.DataParallel(model).to(device)
 
     criterion = nn.CrossEntropyLoss()
-    if dataset_name == 'CIFAR100':
+    if dataset_name in ['CIFAR10', 'CIFAR100']:
         optim = torch.optim.SGD(model.parameters(),
                                 lr=opt.lr,
                                 momentum=opt.momentum,

@@ -2,10 +2,34 @@ import os
 from glob import glob
 from csv import reader
 from torch.utils.data import Dataset
-from torchvision.datasets import CIFAR100
+from torchvision.datasets import CIFAR10, CIFAR100
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomCrop, RandomHorizontalFlip, RandomResizedCrop
 from torchvision.transforms import Resize, ToTensor
 from PIL import Image
+
+
+class CustomCIFAR10(Dataset):
+    def __init__(self, opt, val=False):
+        super(CustomCIFAR10, self).__init__()
+        dir_dataset = opt.dir_dataset
+
+        if val:
+            self.dataset = CIFAR10(root=dir_dataset, train=False, download=True)
+            self.transform = Compose([ToTensor(),
+                                      Normalize(mean=[0.491, 0.482, 0.447], std=[0.247, 0.244, 0.262])])
+
+        else:
+            self.dataset = CIFAR10(root=dir_dataset, train=True, download=True)
+            self.transform = Compose([RandomCrop((32, 32), padding=4, fill=0, padding_mode='constant'),
+                                      RandomHorizontalFlip(),
+                                      ToTensor(),
+                                      Normalize(mean=[0.491, 0.482, 0.447], std=[0.247, 0.244, 0.262])])
+
+    def __getitem__(self, index):
+        return self.transform(self.dataset[index][0]), self.dataset[index][1]
+
+    def __len__(self):
+        return len(self.dataset)
 
 
 class CustomCIFAR100(Dataset):

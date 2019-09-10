@@ -18,10 +18,10 @@ class BaseOptions(object):
         # Attention options
         parser.add_argument('--attention_module', type=str, default='CCM',
                             help='Choose among [BAM, CBAM, None, SE, CCM]')
-        parser.add_argument('--conversion_factor', type=int, default=1)
+        parser.add_argument('--conversion_factor', type=int, default=4)
 
-        parser.add_argument('--dataset', type=str, default='CIFAR100', help='Dataset name. Choose among'
-                                                                            '[CIFAR100, ImageNet, MSCOCO, VOC2007]')
+        parser.add_argument('--dataset', type=str, default='ImageNet', help='Dataset name. Choose among'
+                                                                            '[CIFAR10, CIFAR100, ImageNet, MSCOCO, VOC2007]')
 
         parser.add_argument('--epoch_recent', type=int, default=0)
         parser.add_argument('--dir_checkpoints', type=str, default='./checkpoints')
@@ -29,7 +29,6 @@ class BaseOptions(object):
         parser.add_argument('--iter_report', type=int, default=5)
         parser.add_argument('--iter_save', type=int, default=100000)
         parser.add_argument('--n_workers', type=int, default=2)
-        parser.add_argument('--residual_network_model', type=int, default=50, help="Choose among [18, 34, 50, 101]")
         parser.add_argument('--resume', action='store_true', default=False)
 
         self.parser = parser
@@ -37,14 +36,14 @@ class BaseOptions(object):
     @staticmethod
     def define_hyper_params(args):
         if args.dataset == 'ImageNet':
-            args.batch_size = 128  # default 256
+            args.batch_size = 64  # default 256
             args.dir_dataset = '/userhome/shin_g/Desktop/Projects/SCBAM_1/datasets/ImageNet1K'
             args.epochs = 90
             args.lr = 0.1
             args.momentum = 0.9
             args.weight_decay = 1e-4
 
-        elif args.dataset == 'CIFAR100':
+        elif args.dataset in ['CIFAR10', 'CIFAR100']:
             args.batch_size = 128
             args.epochs = 300
             args.lr = 0.1
@@ -58,8 +57,8 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_single_3(s2)5(d2)x2_0'#'_triple(SR)_3(s2)5(d2)_0'
-        #model_name = args.backbone_network + '28-8_SE_0'
+        model_name = args.backbone_network + str(args.n_layers) + '_' + args.attention_module + '_quadro_v6(3333_d1248)res_0'
+        #model_name = args.backbone_network + '18-1.5_0'
         model_name = model_name.strip('_')
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
