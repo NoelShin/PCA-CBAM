@@ -103,3 +103,23 @@ class CustomImageNet1K(Dataset):
 
     def __len__(self):
         return len(self.dir_input)
+    
+    
+class CustomSVHN(Dataset):
+    def __init__(self, opt, val=False):
+        super(CustomSVHN, self).__init__()
+        dir_dataset = opt.dir_dataset
+
+        if val:
+            self.dataset = SVHN(root=dir_dataset, train=False, download=True)
+            self.transform = Compose([ToTensor()])
+
+        else:
+            self.dataset = SVHN(root=dir_dataset, train=True, download=True)
+            self.transform = Compose([ToTensor()])
+
+    def __getitem__(self, index):
+        return self.transform(self.dataset[index][0]), self.dataset[index][1]
+
+    def __len__(self):
+        return len(self.dataset)
