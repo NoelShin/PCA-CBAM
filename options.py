@@ -92,7 +92,7 @@ class BaseOptions(object):
                 if answer == 'y':
                     args.resume = True
                     best_top1 = {'Epoch': 0, 'Top1': 100.0}
-                    best_top5 = {'Epoch': 0, 'Top1': 100.0}
+                    best_top5 = {'Epoch': 0, 'Top5': 100.0}
                     epoch_recent = 0
                     with open(args.path_log_analysis, 'r') as log:
                         for i, row in enumerate(reader(log)):
