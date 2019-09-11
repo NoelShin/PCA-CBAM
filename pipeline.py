@@ -111,11 +111,11 @@ class CustomSVHN(Dataset):
         dir_dataset = opt.dir_dataset
 
         if val:
-            self.dataset = SVHN(root=dir_dataset, train=False, download=True)
+            self.dataset = SVHN(root=dir_dataset, split='train', download=True)
             self.transform = Compose([ToTensor()])
 
         else:
-            self.dataset = SVHN(root=dir_dataset, train=True, download=True)
+            self.dataset = SVHN(root=dir_dataset, split='test', download=True)
             self.transform = Compose([ToTensor()])
 
     def __getitem__(self, index):
