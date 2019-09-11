@@ -49,6 +49,11 @@ class BaseOptions(object):
             args.lr = 0.1
             args.momentum = 0.9
             args.weight_decay = 1e-4
+            
+        elif args.dataset == 'SVHN':
+            args.batch_size = 128
+            args.lr = 0.01
+            args.epochs = 160
 
     def parse(self):
         args = self.parser.parse_args()
