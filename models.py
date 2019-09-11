@@ -173,6 +173,12 @@ class ResidualNetwork(nn.Module):
                        norm(64),
                        act]
             n_classes = 100
+            
+        elif dataset == 'SVHN':
+            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
+                       norm(64),
+                       act]
+            n_classes = 10
 
         else:
             """
@@ -313,6 +319,12 @@ class ResNext(nn.Module):
                        norm(64),
                        act]
             n_classes = 100
+            
+        elif dataset == 'SVHN':
+            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
+                       norm(64),
+                       act]
+            n_classes = 10
 
         if n_layers == 50:
             network += [RB(64, 256, bottle_neck_ch=128)]
@@ -351,12 +363,21 @@ class WideResNet(nn.Module):
         assert (n_layers - 4) % 6 == 0
         N = (n_layers - 4) // 6
         RB = partial(ResidualBlock, attention=attention, pre_activation=True, conversion_factor=conversion_factor)
+        
         if dataset == 'ImageNet':
             n_classes = 1000
+            
         elif dataset == 'CIFAR10':
             n_classes = 10
+            
         elif dataset == 'CIFAR100':
             n_classes = 100
+            
+        elif dataset == 'SVHN':
+            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
+                       norm(64),
+                       act]
+            n_classes = 10
 
         network = [nn.Conv2d(3, 16, 3, padding=1, bias=False)]
 
