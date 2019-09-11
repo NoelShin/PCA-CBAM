@@ -2,7 +2,7 @@ import os
 from glob import glob
 from csv import reader
 from torch.utils.data import Dataset
-from torchvision.datasets import CIFAR10, CIFAR100
+from torchvision.datasets import CIFAR10, CIFAR100, SVHN
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomCrop, RandomHorizontalFlip, RandomResizedCrop
 from torchvision.transforms import Resize, ToTensor
 from PIL import Image
