@@ -103,8 +103,8 @@ class CustomImageNet1K(Dataset):
 
     def __len__(self):
         return len(self.dir_input)
-    
-    
+
+
 class CustomSVHN(Dataset):
     def __init__(self, opt, val=False):
         super(CustomSVHN, self).__init__()

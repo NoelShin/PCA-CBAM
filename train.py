@@ -37,12 +37,12 @@ if __name__ == '__main__':
         from pipeline import CustomImageNet1K
         dataset = CustomImageNet1K(opt, val=False)
         test_dataset = CustomImageNet1K(opt, val=True)
-        
+
     elif dataset_name == 'SVHN':
         from pipeline import CustomSVHN
         dataset = CustomSVHN(opt, val=False)
         test_dataset = CustomSVHN(opt, val=True)
-        
+
     else:
         raise NotImplementedError("Invalid dataset {}. Choose among ['CIFAR100', 'ImageNet']".format(dataset_name))
 
@@ -63,15 +63,13 @@ if __name__ == '__main__':
         from models import ResidualNetwork
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
-                                attention=opt.attention_module,
-                                conversion_factor=opt.conversion_factor)
+                                attention=opt.attention_module)
 
     elif backbone_network == 'ResNext':
         from models import ResNext
         model = ResNext(n_layers=n_layers,
                         dataset=opt.dataset,
-                        attention=opt.attention_module,
-                        conversion_factor=opt.conversion_factor)
+                        attention=opt.attention_module)
         """
         Other models
         """
@@ -82,6 +80,7 @@ if __name__ == '__main__':
     model = nn.DataParallel(model).to(device)
 
     criterion = nn.CrossEntropyLoss()
+
     if dataset_name in ['CIFAR10', 'CIFAR100']:
         optim = torch.optim.SGD(model.parameters(),
                                 lr=opt.lr,
@@ -95,14 +94,14 @@ if __name__ == '__main__':
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
         milestones = [30, 60]
-        
+
     elif dataset_name == 'SVHN':
         optim = torch.optim.SGD(model.parameters(),
                                 lr=opt.lr,
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
         milestones = [80, 120]
-        
+
     else:
         """
                 For other datasets
