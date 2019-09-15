@@ -9,9 +9,9 @@ class TAM(nn.Module):
             tam += [nn.Conv2d(n_ch, n_ch // 2, 1, groups=n_ch // 2)]
             n_ch //= 2
             if i != conversion_factor - 1:
-                tam += [nn.PReLU(n_ch // 2, init=0.0)]
+                tam += [nn.PReLU(n_ch, init=0.0)]
         tam += [nn.Sigmoid()]
         self.tam = nn.Sequential(*tam)
 
     def forward(self, x):
-        x * self.tam(x)
+        return x * self.tam(x)
