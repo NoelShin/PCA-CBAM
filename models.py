@@ -230,19 +230,25 @@ class ResNext(nn.Module):
                        nn.BatchNorm2d(64),
                        nn.ReLU(inplace=True)]
             n_classes = 100
+            
+        elif dataset == 'SVHN':
+            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
+                       nn.BatchNorm2d(64),
+                       nn.ReLU(inplace=True)]
+            n_classes = 10
 
         if n_layers == 50:
-            network += [RB(64, 256, bottle_neck_ch=128, converion_factor=8)]
-            network += [RB(256, 256, bottle_neck_ch=128, converion_factor=8) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=128, conversion_factor=8)]
+            network += [RB(256, 256, bottle_neck_ch=128, conversion_factor=8) for _ in range(2)]
 
-            network += [RB(256, 512, bottle_neck_ch=256, first_conv_stride=2, converion_factor=9)]  # 28
-            network += [RB(512, 512, bottle_neck_ch=256, converion_factor=9) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=256, first_conv_stride=2, conversion_factor=9)]  # 28
+            network += [RB(512, 512, bottle_neck_ch=256, conversion_factor=9) for _ in range(3)]
 
-            network += [RB(512, 1024, bottle_neck_ch=512, first_conv_stride=2, converion_factor=10)]  # 14
-            network += [RB(1024, 1024, bottle_neck_ch=512, converion_factor=10) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=512, first_conv_stride=2, conversion_factor=10)]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=512, conversion_factor=10) for _ in range(5)]
 
-            network += [RB(1024, 2048, bottle_neck_ch=1024, first_conv_stride=2, converion_factor=11)]
-            network += [RB(2048, 2048, bottle_neck_ch=1024, converion_factor=11) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=1024, first_conv_stride=2, conversion_factor=11)]
+            network += [RB(2048, 2048, bottle_neck_ch=1024, conversion_factor=11) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)),
                         View(-1),
@@ -267,10 +273,15 @@ class WideResNet(nn.Module):
         RB = partial(ResidualBlock, attention=attention, pre_activation=True, conversion_factor=conversion_factor)
         if dataset == 'ImageNet':
             n_classes = 1000
+            
         elif dataset == 'CIFAR10':
             n_classes = 10
+            
         elif dataset == 'CIFAR100':
             n_classes = 100
+            
+        elif dataset == 'SVHN':
+            n_classes = 10
 
         network = [nn.Conv2d(3, 16, 3, padding=1, bias=False)]
 
