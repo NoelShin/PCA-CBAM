@@ -9,7 +9,7 @@ from tam import TAM
 class BasicConv(nn.Module):
     def __init__(self, input_ch, output_ch, kernel_size, padding=0, stride=1, use_batchnorm=True, groups=1):
         super(BasicConv, self).__init__()
-        self.conv = nn.Sequential(nn.Conv2d(input_ch, output_ch, kernel_size, padding, stride,
+        self.conv = nn.Sequential(nn.Conv2d(input_ch, output_ch, kernel_size, stride, padding,
                                             bias=False if use_batchnorm else True, groups=groups),
                                      nn.BatchNorm2d(output_ch),
                                      nn.ReLU(True))
@@ -37,7 +37,7 @@ class MobileNet(nn.Module):
                                      BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch),
                                      BasicConv(8 * n_ch, 8 * n_ch, 1),
 
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch),
                                      BasicConv(8 * n_ch, 16 * n_ch, 1),
 
                                      BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
