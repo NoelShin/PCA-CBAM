@@ -18,43 +18,88 @@ class BasicConv(nn.Module):
         return self.conv(x)
     
 
+class BasicConv(nn.Module):
+    def __init__(self, input_ch, output_ch, kernel_size, padding=0, stride=1, use_batchnorm=True, groups=1,
+                 attention=None, conversion_factor=0):
+        super(BasicConv, self).__init__()
+        self.conv = nn.Sequential(nn.Conv2d(input_ch, output_ch, kernel_size, stride, padding,
+                                            bias=False if use_batchnorm else True, groups=groups),
+                                  nn.BatchNorm2d(output_ch),
+                                  nn.ReLU(True))
+        if attention == 'SE':
+            self.conv.add_module("Attention", SqueezeExcitationBlock(output_ch))
+
+        elif attention == 'TAM':
+            self.conv.add_module("Attention", TAM(output_ch, conversion_factor))
+
+    def forward(self, x):
+        return self.conv(x)
+
+
 class MobileNet(nn.Module):
-    def __init__(self, width_multiplier=1.0, input_ch=3, init_ch=32, n_classes=1000):
+    def __init__(self, width_multiplier=1.0, input_ch=3, init_ch=32, n_classes=1000, attention=None):
         super(MobileNet, self).__init__()
         n_ch = int(init_ch * width_multiplier)
-        self.network = nn.Sequential(BasicConv(input_ch, n_ch, 3, padding=1, stride=2),
 
-                                     BasicConv(n_ch, n_ch, 3, padding=1, groups=n_ch),
-                                     BasicConv(n_ch, 2 * n_ch, 1),
+        self.network = nn.Sequential(BasicConv(input_ch, n_ch, 3, padding=1, stride=2, attention=attention,
+                                               conversion_factor=int(log2(n_ch))),
 
-                                     BasicConv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch),
-                                     BasicConv(2 * n_ch, 4 * n_ch, 1),
-                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch),
-                                     BasicConv(4 * n_ch, 4 * n_ch, 1),
+                                     BasicConv(n_ch, n_ch, 3, padding=1, groups=n_ch, attention=attention,
+                                               conversion_factor=int(log2(n_ch))),
+                                     BasicConv(n_ch, 2 * n_ch, 1, attention=attention,
+                                               conversion_factor=int(log2(2 * n_ch))),
+                                     BasicConv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(2 * n_ch))),
+                                     BasicConv(2 * n_ch, 4 * n_ch, 1, attention=attention,
+                                               conversion_factor=int(log2(4 * n_ch))),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch, attention=attention,
+                                               conversion_factor=int(log2(4 * n_ch))),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 1, attention=attention,
+                                               conversion_factor=int(log2(4 * n_ch))),
 
-                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
-                                     BasicConv(4 * n_ch, 8 * n_ch, 1),
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch),
-                                     BasicConv(8 * n_ch, 8 * n_ch, 1),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(4 * n_ch))),
+                                     BasicConv(4 * n_ch, 8 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
 
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch),
-                                     BasicConv(8 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
+                                     BasicConv(8 * n_ch, 16 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
 
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
 
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 32 * n_ch, 1),
-                                     BasicConv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch),
-                                     BasicConv(32 * n_ch, 32 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 32 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(32 * n_ch))),
+                                     BasicConv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch,
+                                               attention=attention, conversion_factor=int(log2(32 * n_ch))),
+                                     BasicConv(32 * n_ch, 32 * n_ch, 1,
+                                               attention=attention, conversion_factor=int(log2(32 * n_ch))),
 
                                      nn.AdaptiveAvgPool2d((1, 1)),
                                      View(-1),
