@@ -7,20 +7,8 @@ from tam import TAM
 
 
 class BasicConv(nn.Module):
-    def __init__(self, input_ch, output_ch, kernel_size, padding=0, stride=1, use_batchnorm=True, groups=1):
-        super(BasicConv, self).__init__()
-        self.conv = nn.Sequential(nn.Conv2d(input_ch, output_ch, kernel_size, stride, padding,
-                                            bias=False if use_batchnorm else True, groups=groups),
-                                     nn.BatchNorm2d(output_ch),
-                                     nn.ReLU(True))
-
-    def forward(self, x):
-        return self.conv(x)
-    
-
-class BasicConv(nn.Module):
     def __init__(self, input_ch, output_ch, kernel_size, padding=0, stride=1, use_batchnorm=True, groups=1,
-                 attention=None, conversion_factor=0):
+                 attention=None, group_size=2):
         super(BasicConv, self).__init__()
         self.conv = nn.Sequential(nn.Conv2d(input_ch, output_ch, kernel_size, stride, padding,
                                             bias=False if use_batchnorm else True, groups=groups),
@@ -30,76 +18,49 @@ class BasicConv(nn.Module):
             self.conv.add_module("Attention", SqueezeExcitationBlock(output_ch))
 
         elif attention == 'TAM':
-            self.conv.add_module("Attention", TAM(output_ch, conversion_factor))
+            self.conv.add_module("Attention", TAM(output_ch, group_size))
 
     def forward(self, x):
         return self.conv(x)
 
 
 class MobileNet(nn.Module):
-    def __init__(self, width_multiplier=1.0, input_ch=3, init_ch=32, n_classes=1000, attention=None):
+    def __init__(self, width_multiplier=1.0, input_ch=3, init_ch=32, n_classes=1000, attention=None, group_size=2):
         super(MobileNet, self).__init__()
         n_ch = int(init_ch * width_multiplier)
+        conv = partial(BasicConv, attention=attention, group_size=group_size)
+        self.network = nn.Sequential(BasicConv(input_ch, n_ch, 3, padding=1, stride=2),
 
-        self.network = nn.Sequential(BasicConv(input_ch, n_ch, 3, padding=1, stride=2, attention=attention,
-                                               conversion_factor=int(log2(n_ch))),
+                                     BasicConv(n_ch, n_ch, 3, padding=1, groups=n_ch),
+                                     BasicConv(n_ch, 2 * n_ch, 1),
+                                     BasicConv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch),
+                                     BasicConv(2 * n_ch, 4 * n_ch, 1),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 1),
 
-                                     BasicConv(n_ch, n_ch, 3, padding=1, groups=n_ch, attention=attention,
-                                               conversion_factor=int(log2(n_ch))),
-                                     BasicConv(n_ch, 2 * n_ch, 1, attention=attention,
-                                               conversion_factor=int(log2(2 * n_ch))),
-                                     BasicConv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(2 * n_ch))),
-                                     BasicConv(2 * n_ch, 4 * n_ch, 1, attention=attention,
-                                               conversion_factor=int(log2(4 * n_ch))),
-                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch, attention=attention,
-                                               conversion_factor=int(log2(4 * n_ch))),
-                                     BasicConv(4 * n_ch, 4 * n_ch, 1, attention=attention,
-                                               conversion_factor=int(log2(4 * n_ch))),
+                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
+                                     BasicConv(4 * n_ch, 8 * n_ch, 1),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 1),
 
-                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(4 * n_ch))),
-                                     BasicConv(4 * n_ch, 8 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
-                                     BasicConv(8 * n_ch, 8 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
+                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch),
+                                     BasicConv(8 * n_ch, 16 * n_ch, 1),
 
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(8 * n_ch))),
-                                     BasicConv(8 * n_ch, 16 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
 
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(16 * n_ch))),
-                                     BasicConv(16 * n_ch, 32 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(32 * n_ch))),
-                                     BasicConv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch,
-                                               attention=attention, conversion_factor=int(log2(32 * n_ch))),
-                                     BasicConv(32 * n_ch, 32 * n_ch, 1,
-                                               attention=attention, conversion_factor=int(log2(32 * n_ch))),
+                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch),
+                                     BasicConv(16 * n_ch, 32 * n_ch, 1),
+                                     BasicConv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch),
+                                     BasicConv(32 * n_ch, 32 * n_ch, 1),
 
                                      nn.AdaptiveAvgPool2d((1, 1)),
                                      View(-1),
@@ -117,7 +78,7 @@ class MobileNet(nn.Module):
 
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, pre_activation=False, first_conv_stride=1, n_groups=1,
-                 attention='CBAM', conversion_factor=4):
+                 attention='CBAM', group_size=2):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -174,7 +135,7 @@ class ResidualBlock(nn.Module):
             block += [SqueezeExcitationBlock(output_ch)]
 
         elif attention == 'TAM':
-            block += [TAM(output_ch, conversion_factor=conversion_factor)]
+            block += [TAM(output_ch, group_size)]
 
         if input_ch != output_ch:
             side_block = [nn.Conv2d(input_ch, output_ch, 1, stride=first_conv_stride, bias=False),
@@ -195,9 +156,9 @@ class ResidualBlock(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    def __init__(self, n_layers=50, dataset='ImageNet', attention='TAM'):
+    def __init__(self, n_layers=50, dataset='ImageNet', attention='TAM', group_size=2):
         super(ResidualNetwork, self).__init__()
-        RB = partial(ResidualBlock, attention=attention)
+        RB = partial(ResidualBlock, attention=attention, group_size=group_size)
 
         if dataset == 'ImageNet':
             network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
@@ -231,17 +192,17 @@ class ResidualNetwork(nn.Module):
             pass
 
         if n_layers == 18:
-            network += [RB(64, 64, conversion_factor=6),
-                        RB(64, 64, conversion_factor=6)]
+            network += [RB(64, 64),
+                        RB(64, 64)]
 
-            network += [RB(64, 128, first_conv_stride=2, conversion_factor=7),
-                        RB(128, 128, conversion_factor=7)]
+            network += [RB(64, 128, first_conv_stride=2),
+                        RB(128, 128)]
 
-            network += [RB(128, 256, first_conv_stride=2, conversion_factor=8),
-                        RB(256, 256, conversion_factor=8)]
+            network += [RB(128, 256, first_conv_stride=2),
+                        RB(256, 256)]
 
-            network += [RB(256, 512, first_conv_stride=2, conversion_factor=9),
-                        RB(512, 512, conversion_factor=9)]
+            network += [RB(256, 512, first_conv_stride=2),
+                        RB(512, 512)]
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(512, n_classes)]
 
         elif n_layers == 34:
@@ -259,32 +220,32 @@ class ResidualNetwork(nn.Module):
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(512, n_classes)]
 
         elif n_layers == 50:
-            network += [RB(64, 256, bottle_neck_ch=64, conversion_factor=8)]
-            network += [RB(256, 256, bottle_neck_ch=64, conversion_factor=8) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=64)]
+            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, conversion_factor=9)]  # 28
-            network += [RB(512, 512, bottle_neck_ch=128, conversion_factor=9) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]  # 28
+            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
 
-            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2, conversion_factor=10)]  # 14
-            network += [RB(1024, 1024, bottle_neck_ch=256, conversion_factor=10) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(5)]
 
-            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, conversion_factor=11)]
-            network += [RB(2048, 2048, bottle_neck_ch=512, conversion_factor=11) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
+            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
         elif n_layers == 101:
-            network += [RB(64, 256, bottle_neck_ch=64, conversion_factor=8)]
-            network += [RB(256, 256, bottle_neck_ch=64, conversion_factor=8) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=64)]
+            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2, conversion_factor=9)]
-            network += [RB(512, 512, bottle_neck_ch=128, conversion_factor=9) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]
+            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
 
-            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2, conversion_factor=10)]
-            network += [RB(1024, 1024, bottle_neck_ch=256, conversion_factor=10) for _ in range(22)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]
+            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(22)]
 
-            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, conversion_factor=11)]
-            network += [RB(2048, 2048, bottle_neck_ch=512, conversion_factor=11) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
+            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
@@ -318,9 +279,9 @@ class ResidualNetwork(nn.Module):
 
 
 class ResNext(nn.Module):
-    def __init__(self, n_layers=50, n_groups=32, dataset='ImageNet', attention='SE'):
+    def __init__(self, n_layers=50, n_groups=32, dataset='ImageNet', attention='SE', group_size=2):
         super(ResNext, self).__init__()
-        RB = partial(ResidualBlock, attention=attention, n_groups=n_groups)
+        RB = partial(ResidualBlock, attention=attention, n_groups=n_groups, group_size=group_size)
         if dataset == 'ImageNet':
             network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
                        nn.BatchNorm2d(64),
@@ -347,17 +308,17 @@ class ResNext(nn.Module):
             n_classes = 10
 
         if n_layers == 50:
-            network += [RB(64, 256, bottle_neck_ch=128, conversion_factor=8)]
-            network += [RB(256, 256, bottle_neck_ch=128, conversion_factor=8) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=128)]
+            network += [RB(256, 256, bottle_neck_ch=128) for _ in range(2)]
 
-            network += [RB(256, 512, bottle_neck_ch=256, first_conv_stride=2, conversion_factor=9)]  # 28
-            network += [RB(512, 512, bottle_neck_ch=256, conversion_factor=9) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=256, first_conv_stride=2)]  # 28
+            network += [RB(512, 512, bottle_neck_ch=256) for _ in range(3)]
 
-            network += [RB(512, 1024, bottle_neck_ch=512, first_conv_stride=2, conversion_factor=10)]  # 14
-            network += [RB(1024, 1024, bottle_neck_ch=512, conversion_factor=10) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=512, first_conv_stride=2)]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=512) for _ in range(5)]
 
-            network += [RB(1024, 2048, bottle_neck_ch=1024, first_conv_stride=2, conversion_factor=11)]
-            network += [RB(2048, 2048, bottle_neck_ch=1024, conversion_factor=11) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=1024, first_conv_stride=2)]
+            network += [RB(2048, 2048, bottle_neck_ch=1024) for _ in range(2)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)),
                         View(-1),
@@ -374,12 +335,12 @@ class ResNext(nn.Module):
 
 
 class WideResNet(nn.Module):
-    def __init__(self, n_layers=16, widening_factor=8, dataset='ImageNet', attention='None', conversion_factor=4):
+    def __init__(self, n_layers=16, widening_factor=8, dataset='ImageNet', attention='None', group_size=2):
         super(WideResNet, self).__init__()
         assert (n_layers - 4) % 6 == 0
         N = (n_layers - 4) // 6
 
-        RB = partial(ResidualBlock, attention=attention, pre_activation=True, conversion_factor=conversion_factor)
+        RB = partial(ResidualBlock, attention=attention, pre_activation=True, group_size=group_size)
         if dataset == 'ImageNet':
             network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
                        nn.BatchNorm2d(64),
@@ -391,7 +352,7 @@ class WideResNet(nn.Module):
 
         elif dataset == 'CIFAR10':
             network = [nn.Conv2d(3, 16, 3, padding=1, bias=False),
-                       nn.BatchNorm2d(64),
+                       nn.BatchNorm2d(16),
                        nn.ReLU(inplace=True)]
             init_ch = 16
             n_ch = int(init_ch * widening_factor)
@@ -399,7 +360,7 @@ class WideResNet(nn.Module):
 
         elif dataset == 'CIFAR100':
             network = [nn.Conv2d(3, 16, 3, padding=1, bias=False),
-                       nn.BatchNorm2d(64),
+                       nn.BatchNorm2d(16),
                        nn.ReLU(inplace=True)]
             init_ch = 16
             n_ch = int(init_ch * widening_factor)
@@ -413,21 +374,21 @@ class WideResNet(nn.Module):
             n_ch = int(init_ch * widening_factor)
             n_classes = 10
 
-        network += [RB(init_ch, n_ch, first_conv_stride=2, conversion_factor=int(log2(n_ch)))]
+        network += [RB(init_ch, n_ch, first_conv_stride=2)]
         for _ in range(N-1):
-            network += [RB(n_ch, n_ch, conversion_factor=int(log2(n_ch)))]
+            network += [RB(n_ch, n_ch)]
 
-        network += [RB(n_ch, 2 * n_ch, first_conv_stride=2, conversion_factor=int(log2(2 * n_ch)))]
+        network += [RB(n_ch, 2 * n_ch, first_conv_stride=2)]
         for _ in range(N-1):
-            network += [RB(2 * n_ch, 2 * n_ch, conversion_factor=int(log2(2 * n_ch)))]
+            network += [RB(2 * n_ch, 2 * n_ch)]
 
-        network += [RB(2 * n_ch, 4 * n_ch, first_conv_stride=2, conversion_factor=int(log2(4 * n_ch)))]
+        network += [RB(2 * n_ch, 4 * n_ch, first_conv_stride=2)]
         for _ in range(N-1):
-            network += [RB(4 * n_ch, 4 * n_ch, conversion_factor=int(log2(4 * n_ch)))]
+            network += [RB(4 * n_ch, 4 * n_ch)]
 
-        network += [RB(4 * n_ch, 8 * n_ch, first_conv_stride=2, conversion_factor=int(log2(8 * n_ch)))]
+        network += [RB(4 * n_ch, 8 * n_ch, first_conv_stride=2)]
         for _ in range(N - 1):
-            network += [RB(8 * n_ch, 8 * n_ch, conversion_factor=int(log2(8 * n_ch)))]
+            network += [RB(8 * n_ch, 8 * n_ch)]
 
         network += [nn.BatchNorm2d(8 * n_ch),
                     nn.ReLU(True)]
