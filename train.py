@@ -6,7 +6,6 @@ if __name__ == '__main__':
     from torch.utils.data import DataLoader
     import numpy as np
     from options import BaseOptions
-    from pipeline import CustomImageNet1K
     from utils import adjust_lr, cal_top1_and_top5
     from tqdm import tqdm
     from datetime import datetime
@@ -44,7 +43,7 @@ if __name__ == '__main__':
         test_dataset = CustomSVHN(opt, val=True)
 
     else:
-        raise NotImplementedError("Invalid dataset {}. Choose among ['CIFAR100', 'ImageNet']".format(dataset_name))
+        raise NotImplementedError("Invalid dataset {}. Choose among ['CIFAR10', 'CIFAR100', 'ImageNet', 'SVHN']".format(dataset_name))
 
     data_loader = DataLoader(dataset,
                              batch_size=opt.batch_size,
@@ -58,25 +57,35 @@ if __name__ == '__main__':
 
     backbone_network = opt.backbone_network
     n_layers = opt.n_layers
+    
+    if backbone_network == 'MobileNet':
+        from models import MobileNet
+        model = MobileNet(width_multiplier=opt.width_multiplier,
+                          attention=opt.attention_module,
+                          group_size=opt.group_size)
 
     if backbone_network == 'ResNet':
         from models import ResidualNetwork
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
-                                attention=opt.attention_module)
+                                attention=opt.attention_module,
+                                group_size=opt.group_size)
 
     elif backbone_network == 'ResNext':
         from models import ResNext
         model = ResNext(n_layers=n_layers,
                         dataset=opt.dataset,
-                        attention=opt.attention_module)
-        """
-        Other models
-        """
+                        attention=opt.attention_module,
+                        group_size=opt.group_size)
 
     elif backbone_network == 'WideResNet':
         from models import WideResNet
-        model = WideResNet(dataset=opt.dataset, attention=opt.attention_module, conversion_factor=opt.conversion_factor)
+        model = WideResNet(n_layers=n_layers,
+                           widening_factor=opt.widening_factor,
+                           dataset=opt.dataset,
+                           attention=opt.attention_module,
+                           group_size=opt.group_size)
+        
     model = nn.DataParallel(model).to(device)
 
     criterion = nn.CrossEntropyLoss()
