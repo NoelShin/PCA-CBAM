@@ -333,23 +333,42 @@ class WideResNet(nn.Module):
         super(WideResNet, self).__init__()
         assert (n_layers - 4) % 6 == 0
         N = (n_layers - 4) // 6
-        n_ch = int(16 * widening_factor)
+
         RB = partial(ResidualBlock, attention=attention, pre_activation=True, conversion_factor=conversion_factor)
         if dataset == 'ImageNet':
+            network = [nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),
+                       nn.BatchNorm2d(64),
+                       nn.ReLU(inplace=True),
+                       nn.MaxPool2d(kernel_size=3, stride=2, padding=1)]
+            init_ch = 64
+            n_ch = int(init_ch * widening_factor)
             n_classes = 1000
-            
+
         elif dataset == 'CIFAR10':
+            network = [nn.Conv2d(3, 16, 3, padding=1, bias=False),
+                       nn.BatchNorm2d(64),
+                       nn.ReLU(inplace=True)]
+            init_ch = 16
+            n_ch = int(init_ch * widening_factor)
             n_classes = 10
-            
+
         elif dataset == 'CIFAR100':
+            network = [nn.Conv2d(3, 16, 3, padding=1, bias=False),
+                       nn.BatchNorm2d(64),
+                       nn.ReLU(inplace=True)]
+            init_ch = 16
+            n_ch = int(init_ch * widening_factor)
             n_classes = 100
-            
+
         elif dataset == 'SVHN':
+            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
+                       nn.BatchNorm2d(64),
+                       nn.ReLU(inplace=True)]
+            init_ch = 64
+            n_ch = int(init_ch * widening_factor)
             n_classes = 10
 
-        network = [nn.Conv2d(3, 16, 3, padding=1, bias=False)]
-
-        network += [RB(16, n_ch, first_conv_stride=2, conversion_factor=int(log2(n_ch)))]
+        network += [RB(init_ch, n_ch, first_conv_stride=2, conversion_factor=int(log2(n_ch)))]
         for _ in range(N-1):
             network += [RB(n_ch, n_ch, conversion_factor=int(log2(n_ch)))]
 
@@ -361,12 +380,16 @@ class WideResNet(nn.Module):
         for _ in range(N-1):
             network += [RB(4 * n_ch, 4 * n_ch, conversion_factor=int(log2(4 * n_ch)))]
 
-        network += [nn.BatchNorm2d(4 * n_ch),
+        network += [RB(4 * n_ch, 8 * n_ch, first_conv_stride=2, conversion_factor=int(log2(8 * n_ch)))]
+        for _ in range(N - 1):
+            network += [RB(8 * n_ch, 8 * n_ch, conversion_factor=int(log2(8 * n_ch)))]
+
+        network += [nn.BatchNorm2d(8 * n_ch),
                     nn.ReLU(True)]
 
         network += [nn.AdaptiveAvgPool2d((1, 1)),
                     View(-1),
-                    nn.Linear(64 * widening_factor, n_classes)]
+                    nn.Linear(8 * n_ch, n_classes)]
 
         self.network = nn.Sequential(*network)
         self.apply(init_weights)
