@@ -14,11 +14,14 @@ class BaseOptions(object):
         parser.add_argument('--backbone_network', type=str, default='ResNet',
                             help='Choose among [ResNet, WideResNet, ResNext]')
         parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
+        parser.add_argument('--widening_factor', type=float, default=8.0, help='WideResNet parameter')
+        parser.add_argument('--width_multiplier', type=float, default=1.0, help='MobileNet parameter')
 
         # Attention options
-        parser.add_argument('--attention_module', type=str, default='CCM',
-                            help='Choose among [BAM, CBAM, None, SE, CCM]')
-        parser.add_argument('--conversion_factor', type=int, default=8)
+        parser.add_argument('--attention_module', type=str, default='TAM',
+                            help='Choose among [BAM, CBAM, None, SE, TAM]')
+        # parser.add_argument('--conversion_factor', type=int, default=8)
+        parser.add_argument('--group_size', type=int, default=2, help='TAM parameter')
 
         parser.add_argument('--dataset', type=str, default='ImageNet', help='Dataset name. Choose among'
                                                                             '[CIFAR10, CIFAR100, ImageNet, MSCOCO, VOC2007]')
@@ -64,9 +67,11 @@ class BaseOptions(object):
         if args.dataset != 'ImageNet':
             args.dir_dataset = './datasets/{}'.format(args.dataset)
 
-        model_name = args.backbone_network + str(args.n_layers)
-        model_name += '_' + args.widening_factor if args.backbone_network == 'WideResNet' else ''
+        model_name = args.backbone_network
+        model_name += str(args.n_layers) if 'Res' in args.backbone_network else ''
+        model_name += '_' + str(args.widening_factor) if args.backbone_network == 'WideResNet' else ''
         model_name += '_' + args.attention_module
+        model_name += '_' + str(args.group_size) if args.attention_module == 'TAM' else ''
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
         args.dir_model = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Model')
