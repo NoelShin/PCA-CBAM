@@ -349,15 +349,15 @@ class WideResNet(nn.Module):
 
         network = [nn.Conv2d(3, 16, 3, padding=1, bias=False)]
 
-        network += [RB(16, n_ch, conversion_factor=int(log2(n_ch)))]
+        network += [RB(16, n_ch, first_conv_stride=2, conversion_factor=int(log2(n_ch)))]
         for _ in range(N-1):
             network += [RB(n_ch, n_ch, conversion_factor=int(log2(n_ch)))]
 
-        network += [RB(n_ch, 2 * n_ch, conversion_factor=int(log2(2 * n_ch)))]
+        network += [RB(n_ch, 2 * n_ch, first_conv_stride=2, conversion_factor=int(log2(2 * n_ch)))]
         for _ in range(N-1):
             network += [RB(2 * n_ch, 2 * n_ch, conversion_factor=int(log2(2 * n_ch)))]
 
-        network += [RB(2 * n_ch, 4 * n_ch, conversion_factor=int(log2(4 * n_ch)))]
+        network += [RB(2 * n_ch, 4 * n_ch, first_conv_stride=2, conversion_factor=int(log2(4 * n_ch)))]
         for _ in range(N-1):
             network += [RB(4 * n_ch, 4 * n_ch, conversion_factor=int(log2(4 * n_ch)))]
 
