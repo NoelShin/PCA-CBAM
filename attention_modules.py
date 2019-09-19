@@ -77,7 +77,19 @@ class ChannelAxisPool(nn.Module):
         else:
             return torch.var(x, dim=1, keepdim=True)
 
+class GCBlock(nn.Module):
+    def __init__(self, n_ch):
+        super(GCBlock, self).__init__()
+        self.n_ch = n_ch
+        self.conv = nn.Sequential(nn.Conv2d(n_ch, 1, 1), nn.Softmax2d())
 
+    def forward(self, x):
+        batch_size = x.shape[0]
+        init = x.view(batch_size, self.n_ch, -1).unsqueeze(1) # Bx1xNxHW
+        x = self.conv(x).view(batch_size, 1, -1, 1) # Bx1xHxW
+        return torch.matmul(init, x).view(batch_size, self.n_ch, 1, 1)
+    
+    
 class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
