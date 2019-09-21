@@ -306,8 +306,23 @@ class ResNext(nn.Module):
                        nn.BatchNorm2d(64),
                        nn.ReLU(inplace=True)]
             n_classes = 10
+            
+        if n_layers == 29:
+            assert dataset in ['CIFAR10', 'CIFAR100']
+            network += [RB(64, 256, bottle_neck_ch=512)]
+            network += [RB(256, 256, bottle_neck_ch=512) for _ in range(2)]
 
-        if n_layers == 50:
+            network += [RB(256, 512, bottle_neck_ch=1024, first_conv_stride=2)]
+            network += [RB(512, 512, bottle_neck_ch=1024) for _ in range(2)]
+
+            network += [RB(512, 1024, bottle_neck_ch=2048, first_conv_stride=2)]
+            network += [RB(1024, 1024, bottle_neck_ch=2048) for _ in range(2)]
+            
+            network += [nn.AdaptiveAvgPool2d((1, 1)),
+                        View(-1),
+                        nn.Linear(1024, n_classes)]
+            
+        elif n_layers == 50:
             network += [RB(64, 256, bottle_neck_ch=128)]
             network += [RB(256, 256, bottle_neck_ch=128) for _ in range(2)]
 
@@ -323,6 +338,7 @@ class ResNext(nn.Module):
             network += [nn.AdaptiveAvgPool2d((1, 1)),
                         View(-1),
                         nn.Linear(2048, n_classes)]
+            
         self.network = nn.Sequential(*network)
         self.apply(init_weights)
 
@@ -367,10 +383,10 @@ class WideResNet(nn.Module):
             n_classes = 100
 
         elif dataset == 'SVHN':
-            network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
-                       nn.BatchNorm2d(64),
+            network = [nn.Conv2d(3, 16, 3, padding=1, bias=False),
+                       nn.BatchNorm2d(16),
                        nn.ReLU(inplace=True)]
-            init_ch = 64
+            init_ch = 16
             n_ch = int(init_ch * widening_factor)
             n_classes = 10
 
