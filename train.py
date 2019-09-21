@@ -74,6 +74,7 @@ if __name__ == '__main__':
     elif backbone_network == 'ResNext':
         from models import ResNext
         model = ResNext(n_layers=n_layers,
+                        n_groups=opt.n_groups,
                         dataset=opt.dataset,
                         attention=opt.attention_module,
                         group_size=opt.group_size)
