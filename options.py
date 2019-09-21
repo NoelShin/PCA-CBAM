@@ -14,6 +14,7 @@ class BaseOptions(object):
         parser.add_argument('--backbone_network', type=str, default='ResNet',
                             help='Choose among [ResNet, WideResNet, ResNext]')
         parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
+        parser.add_argument('--n_groups', type=int, default=8, help='ResNext cardinality.')
         parser.add_argument('--widening_factor', type=float, default=8.0, help='WideResNet parameter')
         parser.add_argument('--width_multiplier', type=float, default=1.0, help='MobileNet parameter')
 
