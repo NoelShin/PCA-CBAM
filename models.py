@@ -435,7 +435,7 @@ class View(nn.Module):
 
 def init_weights(module):
     if isinstance(module, nn.Conv2d):
-        nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+        nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='leaky_relu')
 
     elif isinstance(module, nn.BatchNorm2d):
         nn.init.ones_(module.weight)
