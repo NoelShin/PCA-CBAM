@@ -92,10 +92,10 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
 
     if dataset_name in ['CIFAR10', 'CIFAR100']:
-        optim = torch.optim.SGD(model.parameters(),
-                                lr=opt.lr,
-                                momentum=opt.momentum,
-                                weight_decay=opt.weight_decay)
+#         optim = torch.optim.SGD(model.parameters(),
+#                                 lr=opt.lr,
+#                                 momentum=opt.momentum,
+#                                 weight_decay=opt.weight_decay)
         
         list_params = list()
         for param in model.named_parameters():
