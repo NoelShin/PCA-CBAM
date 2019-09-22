@@ -73,7 +73,7 @@ class BaseOptions(object):
         model_name += '_' + str(args.widening_factor) if args.backbone_network == 'WideResNet' else ''
         model_name += '_' + args.attention_module
         model_name += '_' + str(args.group_size) if args.attention_module == 'TAM' else ''
-        model_name += '_' + '_revised' if args.attention_module == 'TAM' else ''
+        model_name += '_' + '_wd0_init0.2' if args.attention_module == 'TAM' else ''
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
         args.dir_model = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Model')
