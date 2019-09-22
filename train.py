@@ -96,6 +96,18 @@ if __name__ == '__main__':
                                 lr=opt.lr,
                                 momentum=opt.momentum,
                                 weight_decay=opt.weight_decay)
+        
+        list_params = list()
+        for param in model.named_parameters():
+            if 'tam' in param[0]:
+                idx = param[0].find('tam')
+                idx = int(param[0][idx + 4:].strip('.bias' if param[0].find('bias') != -1 else '.weight'))
+                if idx % 2 == 1:
+                    list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 0, 'momentum': 0.9})
+            else:
+                list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 1e-4, 'momentum': 0.9})
+        optim = torch.optim.SGD(list_params)
+        
         milestones = [150, 225]
 
     elif dataset_name == 'ImageNet':
@@ -106,10 +118,15 @@ if __name__ == '__main__':
         milestones = [30, 60]
 
     elif dataset_name == 'SVHN':
-        optim = torch.optim.SGD(model.parameters(),
-                                lr=opt.lr,
-                                momentum=opt.momentum,
-                                weight_decay=opt.weight_decay)
+        for param in model.named_parameters():
+            if 'tam' in param[0]:
+                idx = param[0].find('tam')
+                idx = int(param[0][idx + 4:].strip('.bias' if param[0].find('bias') != -1 else '.weight'))
+                if idx % 2 == 1:
+                    list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 0, 'momentum': 0.9})
+            else:
+                list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 1e-4, 'momentum': 0.9})
+        optim = torch.optim.SGD(list_params)
         milestones = [80, 120]
 
     else:
