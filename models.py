@@ -390,7 +390,7 @@ class WideResNet(nn.Module):
             n_ch = int(init_ch * widening_factor)
             n_classes = 10
 
-        network += [RB(init_ch, n_ch, first_conv_stride=2)]
+        network += [RB(init_ch, n_ch)]
         for _ in range(N-1):
             network += [RB(n_ch, n_ch)]
 
@@ -402,16 +402,12 @@ class WideResNet(nn.Module):
         for _ in range(N-1):
             network += [RB(4 * n_ch, 4 * n_ch)]
 
-        network += [RB(4 * n_ch, 8 * n_ch, first_conv_stride=2)]
-        for _ in range(N - 1):
-            network += [RB(8 * n_ch, 8 * n_ch)]
-
-        network += [nn.BatchNorm2d(8 * n_ch),
+        network += [nn.BatchNorm2d(4 * n_ch),
                     nn.ReLU(True)]
 
         network += [nn.AdaptiveAvgPool2d((1, 1)),
                     View(-1),
-                    nn.Linear(8 * n_ch, n_classes)]
+                    nn.Linear(4 * n_ch, n_classes)]
 
         self.network = nn.Sequential(*network)
         self.apply(init_weights)
