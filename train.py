@@ -118,6 +118,7 @@ if __name__ == '__main__':
         milestones = [30, 60]
 
     elif dataset_name == 'SVHN':
+        list_params = list()
         for param in model.named_parameters():
             if 'tam' in param[0]:
                 idx = param[0].find('tam')
