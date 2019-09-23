@@ -110,7 +110,7 @@ class CustomSVHN(Dataset):
         super(CustomSVHN, self).__init__()
         dir_dataset = opt.dir_dataset
 
-        if val:
+        if not val:
             self.dataset = SVHN(root=dir_dataset, split='train', download=True)
             self.transform = Compose([ToTensor()])
 
