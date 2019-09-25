@@ -7,13 +7,13 @@ class BaseOptions(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--debug', action='store_true', default=False)
-        parser.add_argument('--gpu_ids', type=str, default='0')
+        parser.add_argument('--gpu_ids', type=str, default='1')
         parser.add_argument('--manual_seed', type=int, default=0)
 
         # Backbone options
-        parser.add_argument('--backbone_network', type=str, default='ResNet',
+        parser.add_argument('--backbone_network', type=str, default='MobileNet',
                             help='Choose among [ResNet, WideResNet, ResNext]')
-        parser.add_argument('--n_layers', type=int, default=50, help='# of weight layers.')
+        parser.add_argument('--n_layers', type=int, default=34, help='# of weight layers.')
         parser.add_argument('--n_groups', type=int, default=8, help='ResNext cardinality.')
         parser.add_argument('--widening_factor', type=float, default=8.0, help='WideResNet parameter')
         parser.add_argument('--width_multiplier', type=float, default=1.0, help='MobileNet parameter')
@@ -24,7 +24,7 @@ class BaseOptions(object):
         # parser.add_argument('--conversion_factor', type=int, default=8)
         parser.add_argument('--group_size', type=int, default=2, help='TAM parameter')
 
-        parser.add_argument('--dataset', type=str, default='ImageNet', help='Dataset name. Choose among'
+        parser.add_argument('--dataset', type=str, default='SVHN', help='Dataset name. Choose among'
                                                                             '[CIFAR10, CIFAR100, ImageNet, MSCOCO, VOC2007]')
 
         parser.add_argument('--epoch_recent', type=int, default=0)
@@ -56,7 +56,7 @@ class BaseOptions(object):
 
         elif args.dataset == 'SVHN':
             args.batch_size = 128
-            args.lr = 0.01
+            args.lr = 0.1
             args.epochs = 160
             args.momentum = 0.9
             args.weight_decay = 1e-4
@@ -72,8 +72,10 @@ class BaseOptions(object):
         model_name += str(args.n_layers) if 'Res' in args.backbone_network else ''
         model_name += '_' + str(args.widening_factor) if args.backbone_network == 'WideResNet' else ''
         model_name += '_' + args.attention_module
+        #model_name += '_revised' if args.attention_module == 'TAM' else ''
         model_name += '_' + str(args.group_size) if args.attention_module == 'TAM' else ''
-        model_name += '_' + '_wd0_init0.2' if args.attention_module == 'TAM' else ''
+        #model_name += '_init0.2' if args.attention_module == 'TAM' else ''
+        #model_name += '_1'
 
         args.dir_analysis = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Analysis')
         args.dir_model = os.path.join(args.dir_checkpoints, args.dataset, model_name, 'Model')
@@ -160,7 +162,3 @@ class BaseOptions(object):
                 log.close()
 
         return args
-
-
-if __name__ == '__main__':
-    opt = BaseOptions().parse()
