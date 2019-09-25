@@ -11,12 +11,11 @@ class TAM(nn.Module):
             n_ch //= group_size
             if n_ch == 1:
                 break
-            tam += [nn.PReLU(n_ch, init=0.2)]
+            tam += [nn.PReLU(n_ch, init=0.0)]
 
         tam += [nn.Conv2d(n_ch, 1, 1)] if n_ch != 1 else []
         tam += [nn.Sigmoid()]
         self.tam = nn.Sequential(*tam)
-        print(self)
 
     def forward(self, x):
         return x * self.tam(x)
