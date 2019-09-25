@@ -24,26 +24,31 @@ if __name__ == '__main__':
 
     if dataset_name == 'CIFAR10':
         from pipeline import CustomCIFAR10
+
         dataset = CustomCIFAR10(opt, val=False)
         test_dataset = CustomCIFAR10(opt, val=True)
 
     elif dataset_name == 'CIFAR100':
         from pipeline import CustomCIFAR100
+
         dataset = CustomCIFAR100(opt, val=False)
         test_dataset = CustomCIFAR100(opt, val=True)
 
     elif dataset_name == 'ImageNet':
         from pipeline import CustomImageNet1K
+
         dataset = CustomImageNet1K(opt, val=False)
         test_dataset = CustomImageNet1K(opt, val=True)
 
     elif dataset_name == 'SVHN':
         from pipeline import CustomSVHN
+
         dataset = CustomSVHN(opt, val=False)
         test_dataset = CustomSVHN(opt, val=True)
 
     else:
-        raise NotImplementedError("Invalid dataset {}. Choose among ['CIFAR10', 'CIFAR100', 'ImageNet', 'SVHN']".format(dataset_name))
+        raise NotImplementedError(
+            "Invalid dataset {}. Choose among ['CIFAR10', 'CIFAR100', 'ImageNet', 'SVHN']".format(dataset_name))
 
     data_loader = DataLoader(dataset,
                              batch_size=opt.batch_size,
@@ -57,15 +62,17 @@ if __name__ == '__main__':
 
     backbone_network = opt.backbone_network
     n_layers = opt.n_layers
-    
+
     if backbone_network == 'MobileNet':
         from models import MobileNet
+
         model = MobileNet(width_multiplier=opt.width_multiplier,
                           attention=opt.attention_module,
                           group_size=opt.group_size)
 
     if backbone_network == 'ResNet':
         from models import ResidualNetwork
+
         model = ResidualNetwork(n_layers=n_layers,
                                 dataset=opt.dataset,
                                 attention=opt.attention_module,
@@ -73,6 +80,7 @@ if __name__ == '__main__':
 
     elif backbone_network == 'ResNext':
         from models import ResNext
+
         model = ResNext(n_layers=n_layers,
                         n_groups=opt.n_groups,
                         dataset=opt.dataset,
@@ -81,33 +89,23 @@ if __name__ == '__main__':
 
     elif backbone_network == 'WideResNet':
         from models import WideResNet
+
         model = WideResNet(n_layers=n_layers,
                            widening_factor=opt.widening_factor,
                            dataset=opt.dataset,
                            attention=opt.attention_module,
                            group_size=opt.group_size)
-        
+
     model = nn.DataParallel(model).to(device)
 
     criterion = nn.CrossEntropyLoss()
 
     if dataset_name in ['CIFAR10', 'CIFAR100']:
-#         optim = torch.optim.SGD(model.parameters(),
-#                                 lr=opt.lr,
-#                                 momentum=opt.momentum,
-#                                 weight_decay=opt.weight_decay)
-        
-        list_params = list()
-        for param in model.named_parameters():
-            if 'tam' in param[0]:
-                idx = param[0].find('tam')
-                idx = int(param[0][idx + 4:].strip('.bias' if param[0].find('bias') != -1 else '.weight'))
-                if idx % 2 == 1:
-                    list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 0, 'momentum': 0.9})
-            else:
-                list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 1e-4, 'momentum': 0.9})
-        optim = torch.optim.SGD(list_params)
-        
+        optim = torch.optim.SGD(model.parameters(),
+                                lr=opt.lr,
+                                momentum=opt.momentum,
+                                weight_decay=opt.weight_decay)
+
         milestones = [150, 225]
 
     elif dataset_name == 'ImageNet':
@@ -118,16 +116,11 @@ if __name__ == '__main__':
         milestones = [30, 60]
 
     elif dataset_name == 'SVHN':
-        list_params = list()
-        for param in model.named_parameters():
-            if 'tam' in param[0]:
-                idx = param[0].find('tam')
-                idx = int(param[0][idx + 4:].strip('.bias' if param[0].find('bias') != -1 else '.weight'))
-                if idx % 2 == 1:
-                    list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 0, 'momentum': 0.9})
-            else:
-                list_params.append({'params': param[1], 'lr': 0.1, 'weight_decay': 1e-4, 'momentum': 0.9})
-        optim = torch.optim.SGD(list_params)
+        optim = torch.optim.SGD(model.parameters(),
+                                lr=opt.lr,
+                                momentum=opt.momentum,
+                                weight_decay=opt.weight_decay)
+
         milestones = [80, 120]
 
     else:
