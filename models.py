@@ -1,5 +1,4 @@
 from functools import partial
-from math import log2
 import torch.nn as nn
 import torch.nn.functional as F
 from attention_modules import CBAM, SqueezeExcitationBlock
@@ -29,38 +28,38 @@ class MobileNet(nn.Module):
         super(MobileNet, self).__init__()
         n_ch = int(init_ch * width_multiplier)
         conv = partial(BasicConv, attention=attention, group_size=group_size)
-        self.network = nn.Sequential(BasicConv(input_ch, n_ch, 3, padding=1, stride=2),
+        self.network = nn.Sequential(conv(input_ch, n_ch, 3, padding=1, stride=2),
 
-                                     BasicConv(n_ch, n_ch, 3, padding=1, groups=n_ch),
-                                     BasicConv(n_ch, 2 * n_ch, 1),
-                                     BasicConv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch),
-                                     BasicConv(2 * n_ch, 4 * n_ch, 1),
-                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch),
-                                     BasicConv(4 * n_ch, 4 * n_ch, 1),
+                                     conv(n_ch, n_ch, 3, padding=1, groups=n_ch),
+                                     conv(n_ch, 2 * n_ch, 1),
+                                     conv(2 * n_ch, 2 * n_ch, 3, padding=1, stride=2, groups=2 * n_ch),
+                                     conv(2 * n_ch, 4 * n_ch, 1),
+                                     conv(4 * n_ch, 4 * n_ch, 3, padding=1, groups=4 * n_ch),
+                                     conv(4 * n_ch, 4 * n_ch, 1),
 
-                                     BasicConv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
-                                     BasicConv(4 * n_ch, 8 * n_ch, 1),
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch),
-                                     BasicConv(8 * n_ch, 8 * n_ch, 1),
+                                     conv(4 * n_ch, 4 * n_ch, 3, padding=1, stride=2, groups=4 * n_ch),
+                                     conv(4 * n_ch, 8 * n_ch, 1),
+                                     conv(8 * n_ch, 8 * n_ch, 3, padding=1, groups=8 * n_ch),
+                                     conv(8 * n_ch, 8 * n_ch, 1),
 
-                                     BasicConv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch),
-                                     BasicConv(8 * n_ch, 16 * n_ch, 1),
+                                     conv(8 * n_ch, 8 * n_ch, 3, padding=1, stride=2, groups=8 * n_ch),
+                                     conv(8 * n_ch, 16 * n_ch, 1),
 
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 16 * n_ch, 1),
+                                     conv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     conv(16 * n_ch, 16 * n_ch, 1),
+                                     conv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     conv(16 * n_ch, 16 * n_ch, 1),
+                                     conv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     conv(16 * n_ch, 16 * n_ch, 1),
+                                     conv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     conv(16 * n_ch, 16 * n_ch, 1),
+                                     conv(16 * n_ch, 16 * n_ch, 3, padding=1, groups=16 * n_ch),
+                                     conv(16 * n_ch, 16 * n_ch, 1),
 
-                                     BasicConv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch),
-                                     BasicConv(16 * n_ch, 32 * n_ch, 1),
-                                     BasicConv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch),
-                                     BasicConv(32 * n_ch, 32 * n_ch, 1),
+                                     conv(16 * n_ch, 16 * n_ch, 3, padding=1, stride=2, groups=16 * n_ch),
+                                     conv(16 * n_ch, 32 * n_ch, 1),
+                                     conv(32 * n_ch, 32 * n_ch, 3, padding=1, groups=32 * n_ch),
+                                     conv(32 * n_ch, 32 * n_ch, 1),
 
                                      nn.AdaptiveAvgPool2d((1, 1)),
                                      View(-1),
@@ -74,11 +73,11 @@ class MobileNet(nn.Module):
 
     def forward(self, x):
         return self.network(x)
-    
+
 
 class ResidualBlock(nn.Module):
     def __init__(self, input_ch, output_ch, bottle_neck_ch=0, pre_activation=False, first_conv_stride=1, n_groups=1,
-                 attention='CBAM', group_size=2):
+                 attention='CBAM', group_size=2, disable_attention=False):
         super(ResidualBlock, self).__init__()
         act = nn.ReLU(inplace=True)
         norm = nn.BatchNorm2d
@@ -135,7 +134,7 @@ class ResidualBlock(nn.Module):
             block += [SqueezeExcitationBlock(output_ch)]
 
         elif attention == 'TAM':
-            block += [TAM(output_ch, group_size)]
+            block += [TAM(output_ch, group_size, bypass=disable_attention)]
 
         if input_ch != output_ch:
             side_block = [nn.Conv2d(input_ch, output_ch, 1, stride=first_conv_stride, bias=False),
@@ -156,7 +155,7 @@ class ResidualBlock(nn.Module):
 
 
 class ResidualNetwork(nn.Module):
-    def __init__(self, n_layers=50, dataset='ImageNet', attention='TAM', group_size=2):
+    def __init__(self, n_layers=50, dataset='ImageNet', attention='TAM', group_size=2, disable_attention=0):
         super(ResidualNetwork, self).__init__()
         RB = partial(ResidualBlock, attention=attention, group_size=group_size)
 
@@ -220,17 +219,27 @@ class ResidualNetwork(nn.Module):
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(512, n_classes)]
 
         elif n_layers == 50:
-            network += [RB(64, 256, bottle_neck_ch=64)]
-            network += [RB(256, 256, bottle_neck_ch=64) for _ in range(2)]
+            network += [RB(64, 256, bottle_neck_ch=64, disable_attention=True if disable_attention == 1 else False)]
+            network += [RB(256, 256, bottle_neck_ch=64, disable_attention=True if disable_attention == 2 else False)]
+            network += [RB(256, 256, bottle_neck_ch=64, disable_attention=True if disable_attention == 3 else False)]
 
-            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2)]  # 28
-            network += [RB(512, 512, bottle_neck_ch=128) for _ in range(3)]
+            network += [RB(256, 512, bottle_neck_ch=128, first_conv_stride=2,
+                           disable_attention=True if disable_attention == 4 else False)]  # 28
+            network += [RB(512, 512, bottle_neck_ch=128, disable_attention=True if disable_attention == 5 else False)]
+            network += [RB(512, 512, bottle_neck_ch=128, disable_attention=True if disable_attention == 6 else False)]
+            network += [RB(512, 512, bottle_neck_ch=128, disable_attention=True if disable_attention == 7 else False)]
 
-            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2)]  # 14
-            network += [RB(1024, 1024, bottle_neck_ch=256) for _ in range(5)]
+            network += [RB(512, 1024, bottle_neck_ch=256, first_conv_stride=2,
+                           disable_attention=True if disable_attention == 8 else False)]  # 14
+            network += [RB(1024, 1024, bottle_neck_ch=256, disable_attention=True if disable_attention == 9 else False)]
+            network += [RB(1024, 1024, bottle_neck_ch=256, disable_attention=True if disable_attention == 10 else False)]
+            network += [RB(1024, 1024, bottle_neck_ch=256, disable_attention=True if disable_attention == 11 else False)]
+            network += [RB(1024, 1024, bottle_neck_ch=256, disable_attention=True if disable_attention == 12 else False)]
+            network += [RB(1024, 1024, bottle_neck_ch=256, disable_attention=True if disable_attention == 13 else False)]
 
-            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2)]
-            network += [RB(2048, 2048, bottle_neck_ch=512) for _ in range(2)]
+            network += [RB(1024, 2048, bottle_neck_ch=512, first_conv_stride=2, disable_attention=True if disable_attention == 14 else False)]
+            network += [RB(2048, 2048, bottle_neck_ch=512, disable_attention=True if disable_attention == 15 else False)]
+            network += [RB(2048, 2048, bottle_neck_ch=512, disable_attention=True if disable_attention == 16 else False)]
 
             network += [nn.AdaptiveAvgPool2d((1, 1)), View(-1), nn.Linear(2048, n_classes)]
 
@@ -300,15 +309,15 @@ class ResNext(nn.Module):
                        nn.BatchNorm2d(64),
                        nn.ReLU(inplace=True)]
             n_classes = 100
-            
+
         elif dataset == 'SVHN':
             network = [nn.Conv2d(3, 64, 3, padding=1, bias=False),
                        nn.BatchNorm2d(64),
                        nn.ReLU(inplace=True)]
             n_classes = 10
-            
+
         if n_layers == 29:
-            assert dataset in ['CIFAR10', 'CIFAR100']
+            assert 'ImageNet' not in dataset
             network += [RB(64, 256, bottle_neck_ch=512)]
             network += [RB(256, 256, bottle_neck_ch=512) for _ in range(2)]
 
@@ -317,11 +326,11 @@ class ResNext(nn.Module):
 
             network += [RB(512, 1024, bottle_neck_ch=2048, first_conv_stride=2)]
             network += [RB(1024, 1024, bottle_neck_ch=2048) for _ in range(2)]
-            
+
             network += [nn.AdaptiveAvgPool2d((1, 1)),
                         View(-1),
                         nn.Linear(1024, n_classes)]
-            
+
         elif n_layers == 50:
             network += [RB(64, 256, bottle_neck_ch=128)]
             network += [RB(256, 256, bottle_neck_ch=128) for _ in range(2)]
@@ -338,7 +347,7 @@ class ResNext(nn.Module):
             network += [nn.AdaptiveAvgPool2d((1, 1)),
                         View(-1),
                         nn.Linear(2048, n_classes)]
-            
+
         self.network = nn.Sequential(*network)
         self.apply(init_weights)
 
@@ -391,15 +400,15 @@ class WideResNet(nn.Module):
             n_classes = 10
 
         network += [RB(init_ch, n_ch)]
-        for _ in range(N-1):
+        for _ in range(N - 1):
             network += [RB(n_ch, n_ch)]
 
         network += [RB(n_ch, 2 * n_ch, first_conv_stride=2)]
-        for _ in range(N-1):
+        for _ in range(N - 1):
             network += [RB(2 * n_ch, 2 * n_ch)]
 
         network += [RB(2 * n_ch, 4 * n_ch, first_conv_stride=2)]
-        for _ in range(N-1):
+        for _ in range(N - 1):
             network += [RB(4 * n_ch, 4 * n_ch)]
 
         network += [nn.BatchNorm2d(4 * n_ch),
@@ -431,7 +440,7 @@ class View(nn.Module):
 
 def init_weights(module):
     if isinstance(module, nn.Conv2d):
-        nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
 
     elif isinstance(module, nn.BatchNorm2d):
         nn.init.ones_(module.weight)
@@ -439,14 +448,3 @@ def init_weights(module):
 
     elif isinstance(module, nn.Linear):
         nn.init.kaiming_normal_(module.weight)
-
-
-if __name__ == '__main__':
-    resnet = ResidualNetwork(50, dataset='ImageNet', attention='TAM')
-    #resnext = ResNext(50, dataset='ImageNet', attention='None')
-    # wrn = WideResNet(28, dataset='CIFAR100', attention='None')
-
-    from ptflops import get_model_complexity_info
-
-    flops, params = get_model_complexity_info(resnet, (3, 224, 224), as_strings=False, print_per_layer_stat=True)
-    print('GFlops:  ', flops / (1.024 ** 3), '# Params: ', params)
